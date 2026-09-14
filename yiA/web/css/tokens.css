@@ -1,0 +1,46 @@
+/* yiA 设计令牌：暗色（默认，玻璃浮于暖调书房环境）+ 亮色（body.light，暖纸书房） */
+:root{
+  /* 文字三级 */
+  --t1:rgba(255,255,255,.96); --t2:rgba(255,255,255,.72); --t3:rgba(255,255,255,.55);
+  --hair:rgba(255,255,255,.16);
+  /* 玻璃 */
+  --glass:rgba(255,255,255,.14); --glass-sub:rgba(255,255,255,.10);
+  --glass-border:rgba(255,255,255,.20); --glass-border-soft:rgba(255,255,255,.16);
+  --row-hover:rgba(255,255,255,.06); --row-hover-strong:rgba(255,255,255,.16);
+  --btn-glass-bg:rgba(255,255,255,.14); --btn-glass-hover:rgba(255,255,255,.22);
+  --btn-sub:rgba(255,255,255,.10); --btn-sub-hover:rgba(255,255,255,.18);
+  --nav-active:rgba(255,255,255,.28);
+  --chip-bg:rgba(255,255,255,.10);
+  --seg-bg:rgba(255,255,255,.10); --seg-sel:rgba(255,255,255,.28);
+  --input-bg:rgba(255,255,255,.10); --input-border:rgba(255,255,255,.16); --input-border-focus:rgba(255,255,255,.35);
+  --thumb:rgba(255,255,255,.35);
+  --scrim:rgba(20,18,16,.45);
+  /* 图谱 */
+  --node-fill:rgba(255,255,255,.85); --edge:rgba(255,255,255,.25);
+  --corner:rgba(255,255,255,.55);
+  /* 语义色 */
+  --accent:#E26252; --accent-bg:rgba(226,98,82,.16);
+  --ok:#34C759; --ok-bg:rgba(52,199,89,.16);
+  --ink:rgba(28,28,30,.92);
+  /* 字体 */
+  --sans:-apple-system,"SF Pro Display",Inter,"PingFang SC",sans-serif;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+body.light{
+  --t1:rgba(43,38,32,.96); --t2:rgba(43,38,32,.78); --t3:rgba(43,38,32,.55);
+  --hair:rgba(43,38,32,.14);
+  --glass:rgba(255,255,255,.46); --glass-sub:rgba(255,255,255,.38);
+  --glass-border:rgba(255,255,255,.55); --glass-border-soft:rgba(255,255,255,.50);
+  --row-hover:rgba(43,38,32,.05); --row-hover-strong:rgba(255,255,255,.50);
+  --btn-glass-bg:rgba(255,255,255,.40); --btn-glass-hover:rgba(255,255,255,.60);
+  --btn-sub:rgba(255,255,255,.35); --btn-sub-hover:rgba(255,255,255,.55);
+  --nav-active:rgba(255,255,255,.65);
+  --chip-bg:rgba(255,255,255,.45);
+  --seg-bg:rgba(255,255,255,.40); --seg-sel:rgba(255,255,255,.75);
+  --input-bg:rgba(255,255,255,.45); --input-border:rgba(43,38,32,.15); --input-border-focus:rgba(43,38,32,.35);
+  --thumb:rgba(43,38,32,.30);
+  --scrim:rgba(60,50,40,.25);
+  --node-fill:rgba(59,49,40,.82); --edge:rgba(59,49,40,.30);
+  --corner:rgba(59,49,40,.45);
+}

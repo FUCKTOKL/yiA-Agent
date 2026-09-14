@@ -1,0 +1,19 @@
+/* 页面三：提醒 */
+.rem-note{font-family:var(--mono);font-size:12px;color:var(--t3);margin:16px 0 4px}
+.rem-list{flex:1;min-height:0;padding-right:8px}
+.rem-row{display:grid;grid-template-columns:150px 1fr 110px 130px;align-items:center;gap:16px;
+  min-height:64px;padding:10px 6px;border-bottom:1px solid var(--hair);transition:background .2s}
+.rem-row:last-child{border-bottom:none}
+.rem-row:hover{background:var(--row-hover)}
+.rem-time{font-family:var(--mono);font-size:14px;line-height:1.6}
+.rem-time b{font-weight:500;color:var(--t1);display:block}
+.rem-time span{color:var(--t2)}
+.rem-time .rep{display:block;font-size:11px;color:var(--t3)}
+.rem-txt{font-size:15px}
+.badge{font-size:11.5px;font-family:var(--mono);border-radius:999px;padding:4px 12px;justify-self:start}
+.badge.wechat{color:var(--ok);background:var(--ok-bg);border:1px solid rgba(52,199,89,.45)}
+.badge.tui{color:var(--t2);background:var(--seg-bg);border:1px solid var(--glass-border-soft)}
+.rem-ops{display:flex;gap:16px;justify-content:flex-end}
+.rem-row.done{opacity:.4}
+.rem-row.done .rem-txt{text-decoration:line-through}
+.rem-row.done:hover{background:none}

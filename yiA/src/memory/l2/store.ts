@@ -17,7 +17,7 @@
  * 检索纯内存——避免每次 save/search 全量重读目录（bench 验证万条 <1s）。
  * ponytail: 冷启动首次 all() 需读全部文件（万条约数秒）；过慢时加 index.json 持久化。
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildDoc, rankDocs } from "./bm25.ts";
 import type { Doc, ScoredEntry } from "./bm25.ts";
@@ -103,10 +103,30 @@ export class L2Store {
     return (this.docs as Doc[]).map((d) => d.entry);
   }
 
+  /** 强制重读磁盘（Web 场景：对话经 agent 写入新条目，长驻进程的内存索引会过期） */
+  reload(): void {
+    this.loadFromDisk();
+  }
+
   /** 按 id 查条目；不存在返回 null */
   byId(id: string): L2Entry | null {
     if (this.docs === null) this.loadFromDisk();
     return (this.docs as Doc[]).find((d) => d.entry.id === id)?.entry ?? null;
+  }
+
+  /** 删除条目：移除文件 + 清除其他条目 links 里对本 id 的反向引用（防悬空链接） */
+  delete(id: string): boolean {
+    if (!this.byId(id)) return false;
+    for (const e of this.all()) {
+      if (e.links.includes(id)) this.setLinks(e.id, e.links.filter((l) => l !== id));
+    }
+    try {
+      rmSync(join(this.dir, `${id}.md`));
+    } catch {
+      return false;
+    }
+    this.docs = (this.docs as Doc[]).filter((d) => d.entry.id !== id);
+    return true;
   }
 
   /**
