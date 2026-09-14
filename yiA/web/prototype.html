@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yiA · 第二大脑 — Web 原型</title>
+<style>
+/* ── 设计锚点：个人档案馆。纸色底、墨色字、朱砂印。元数据一律等宽（档案编号感）。 ── */
+:root {
+  --paper: #f2ecdf;        /* 陈纸 */
+  --paper-deep: #e9e1cf;   /* 纸背阴 */
+  --card: #faf6ec;         /* 新卡片 */
+  --ink: #26221b;          /* 墨 */
+  --ink-soft: #6b6353;     /* 淡墨 */
+  --rule: #d5cbb4;         /* 栏线 */
+  --seal: #b5391e;         /* 朱砂 */
+  --seal-dim: #b5391e22;
+  --olive: #5a6b46;        /* 苔绿（次强调） */
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --serif: Georgia, "Songti SC", "Noto Serif CJK SC", "SimSun", serif;
+  --sans: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  font-family: var(--sans); color: var(--ink); height: 100vh;
+  display: grid; grid-template-columns: 208px 1fr; overflow: hidden;
+}
+::selection { background: var(--seal); color: var(--card); }
+
+/* ── 左栏：档案索引签 ── */
+aside {
+  border-right: 1px solid var(--rule); padding: 28px 0 20px;
+  display: flex; flex-direction: column; background: var(--paper-deep);
+}
+.brand { padding: 0 22px 24px; border-bottom: 1px solid var(--rule); margin-bottom: 18px; }
+.brand h1 { font-family: var(--serif); font-size: 40px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+.brand h1 i { font-style: normal; color: var(--seal); }
+.stamp {
+  display: inline-block; margin-top: 10px; padding: 3px 8px;
+  border: 1.5px solid var(--seal); color: var(--seal); border-radius: 3px;
+  font-family: var(--mono); font-size: 10px; transform: rotate(-2deg);
+}
+nav { flex: 1; }
+nav button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  border-left: 3px solid transparent; padding: 13px 22px; cursor: pointer;
+  font-family: var(--serif); font-size: 16.5px; color: var(--ink-soft);
+  transition: none;
+}
+nav button:hover { color: var(--ink); background: #e4dbc5; }
+nav button.on { color: var(--ink); border-left-color: var(--seal); background: var(--paper); font-weight: 700; }
+nav button .n { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); margin-right: 9px; }
+.pulse { margin: 0 22px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); line-height: 2; }
+.pulse b { color: var(--olive); font-weight: 400; }
+.pulse b::before { content: "● "; font-size: 8px; vertical-align: 1px; }
+
+/* ── 主区 ── */
+main { display: flex; flex-direction: column; overflow: hidden; }
+.page { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.page.on { display: flex; }
+.pagehead {
+  padding: 22px 36px 16px; border-bottom: 1px solid var(--rule);
+  display: flex; align-items: baseline; gap: 14px; flex-shrink: 0;
+}
+.pagehead h2 { font-family: var(--serif); font-size: 21px; font-weight: 700; }
+.pagehead .sub { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+
+/* ── 对话页：对话账本 ── */
+#chat { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+#feed { flex: 1; overflow-y: auto; padding: 26px 36px; }
+.msg { max-width: 72%; margin-bottom: 20px; }
+.msg .who { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 5px; }
+.msg .who b { color: var(--seal); font-weight: 400; }
+.msg .body {
+  font-size: 14.5px; line-height: 1.75; padding: 13px 17px;
+  border: 1px solid var(--rule); background: var(--card);
+}
+.msg.me { margin-left: auto; }
+.msg.me .body { background: var(--paper-deep); border-color: #c9bd9f; }
+.msg.me .who { text-align: right; }
+.msg .body .src {
+  display: block; margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--rule);
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft);
+}
+.ctx {
+  max-width: 72%; margin: 0 auto 22px; padding: 8px 12px;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-soft);
+  border: 1px dashed var(--rule); background: none;
+}
+.ctx summary { cursor: pointer; list-style: none; color: var(--olive); }
+.ctx summary::before { content: "◇ "; }
+.composer {
+  display: flex; gap: 10px; padding: 16px 36px 20px; border-top: 1px solid var(--rule); flex-shrink: 0;
+}
+.composer input {
+  flex: 1; border: 1px solid #c9bd9f; background: var(--card); padding: 12px 15px;
+  font-size: 14px; font-family: var(--sans); color: var(--ink); outline: none;
+}
+.composer input:focus { border-color: var(--ink); }
+.composer button {
+  border: none; background: var(--ink); color: var(--card); padding: 0 26px;
+  font-family: var(--serif); font-size: 15px; cursor: pointer;
+}
+.composer button:active { background: var(--seal); }
+
+/* ── 记忆页：索引卡 ── */
+#kb { flex: 1; overflow-y: auto; padding: 24px 36px; }
+.kb-bar { display: flex; gap: 10px; margin-bottom: 22px; }
+.kb-bar input {
+  flex: 1; max-width: 420px; border: none; border-bottom: 1.5px solid var(--ink);
+  background: none; padding: 8px 2px; font-size: 14px; font-family: var(--sans); outline: none;
+}
+.kb-bar .count { align-self: center; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+.cards { columns: 3 260px; column-gap: 18px; }
+.card {
+  break-inside: avoid; background: var(--card); border: 1px solid var(--rule);
+  padding: 15px 16px 13px; margin-bottom: 18px; cursor: pointer; position: relative;
+  transition: transform .08s ease;
+}
+.card:hover { transform: translateY(-2px); border-color: #b9ac8b; }
+.card.tilt:nth-child(3n) { transform: rotate(.35deg); }
+.card.tilt:nth-child(3n+1) { transform: rotate(-.3deg); }
+.card.tilt:hover { transform: rotate(0) translateY(-2px); }
+.card h3 { font-size: 14.5px; font-family: var(--serif); font-weight: 700; margin-bottom: 7px; }
+.card p { font-size: 12.5px; line-height: 1.7; color: #46412f; margin-bottom: 10px; }
+.card .meta { font-family: var(--mono); font-size: 9.5px; color: var(--ink-soft); display: flex; gap: 10px; flex-wrap: wrap; }
+.card .meta .tag { color: var(--olive); }
+.card .pin { position: absolute; top: -7px; right: 12px; font-family: var(--mono); font-size: 9px; color: var(--seal); border: 1px solid var(--seal); border-radius: 2px; padding: 1px 5px; background: var(--card); }
+
+/* ── 提醒页：日程簿 ── */
+#rem { flex: 1; overflow-y: auto; padding: 24px 36px; }
+.rrow {
+  display: grid; grid-template-columns: 110px 1fr auto auto; gap: 16px; align-items: center;
+  padding: 15px 6px; border-bottom: 1px solid var(--rule);
+}
+.rrow:first-of-type { border-top: 1.5px solid var(--ink); }
+.rrow .when { font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+.rrow .when b { color: var(--seal); font-weight: 400; }
+.rrow .what { font-size: 14px; }
+.rrow .chan { font-family: var(--mono); font-size: 10px; color: var(--olive); border: 1px solid var(--olive); padding: 2px 7px; border-radius: 2px; }
+.rrow .chan.tui { color: var(--ink-soft); border-color: var(--ink-soft); }
+.rrow button {
+  border: none; background: none; color: var(--ink-soft); cursor: pointer;
+  font-family: var(--mono); font-size: 11px; text-decoration: underline;
+}
+.rrow button:hover { color: var(--seal); }
+.rrow.done .what { text-decoration: line-through; color: var(--ink-soft); }
+.rhead { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); margin-bottom: 14px; }
+
+/* ── 图谱页 ── */
+#graph-wrap { flex: 1; position: relative; overflow: hidden; }
+#graph-wrap canvas { position: absolute; inset: 0; cursor: grab; }
+.glegend {
+  position: absolute; left: 36px; bottom: 26px; font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-soft); line-height: 2; pointer-events: none;
+}
+.glegend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
+
+/* ── 微信页 ── */
+#wx { flex: 1; overflow-y: auto; padding: 24px 36px; }
+.wx-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 34px; max-width: 880px; }
+.wx-block h3 { font-family: var(--serif); font-size: 16px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.kv { display: grid; grid-template-columns: 118px 1fr; row-gap: 11px; font-size: 13px; }
+.kv dt { color: var(--ink-soft); font-size: 12px; }
+.kv dd { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.kv dd.ok { color: var(--olive); }
+.kv dd.bad { color: var(--seal); }
+.wx-qr {
+  background: var(--card); border: 1px solid var(--rule); padding: 20px;
+  display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center;
+}
+.wx-qr .frame {
+  width: 128px; height: 128px; border: 2px solid var(--ink); display: grid; place-items: center;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-soft);
+  background:
+    repeating-conic-gradient(var(--ink) 0 25%, transparent 0 50%) 0 0/16px 16px;
+  position: relative;
+}
+.wx-qr .frame::after { content: ""; position: absolute; inset: 34px; background: var(--card); border: 2px solid var(--ink); }
+.wx-qr p { font-size: 12px; color: var(--ink-soft); line-height: 1.7; }
+.wx-btn {
+  border: 1.5px solid var(--ink); background: none; padding: 8px 20px; cursor: pointer;
+  font-family: var(--serif); font-size: 13.5px; margin-top: 20px;
+}
+.wx-btn:hover { background: var(--ink); color: var(--card); }
+.wx-btn.danger { border-color: var(--seal); color: var(--seal); }
+.wx-btn.danger:hover { background: var(--seal); color: var(--card); }
+.toast {
+  position: fixed; bottom: 28px; right: 32px; background: var(--ink); color: var(--card);
+  font-family: var(--mono); font-size: 11.5px; padding: 10px 16px; z-index: 9;
+  animation: stampin .18s ease;
+}
+@keyframes stampin { from { transform: scale(1.15); opacity: 0; } }
+
+/* 详情抽屉 */
+#drawer {
+  position: fixed; top: 0; right: -420px; width: 400px; height: 100vh; background: var(--card);
+  border-left: 1.5px solid var(--ink); z-index: 8; padding: 30px 26px;
+  transition: right .16s ease; overflow-y: auto;
+}
+#drawer.on { right: 0; }
+#drawer h3 { font-family: var(--serif); font-size: 18px; margin-bottom: 4px; }
+#drawer .id { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 16px; }
+#drawer .fm { border: 1px solid var(--rule); background: var(--paper); padding: 12px 14px; font-family: var(--mono); font-size: 11px; line-height: 1.9; color: #46412f; margin-bottom: 16px; }
+#drawer .txt { font-size: 13.5px; line-height: 1.85; white-space: pre-wrap; }
+#drawer .close { position: absolute; top: 18px; right: 20px; border: none; background: none; font-size: 17px; cursor: pointer; color: var(--ink-soft); }
+#drawer .acts { margin-top: 22px; display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <h1>y<i>i</i>A</h1>
+    <span class="stamp">第二大脑 · 档案 №1</span>
+  </div>
+  <nav id="nav">
+    <button class="on" data-p="chat"><span class="n">01</span>对话</button>
+    <button data-p="kb"><span class="n">02</span>记忆</button>
+    <button data-p="rem"><span class="n">03</span>提醒</button>
+    <button data-p="graph"><span class="n">04</span>图谱</button>
+    <button data-p="wx"><span class="n">05</span>微信</button>
+  </nav>
+  <div class="pulse">
+    daemon <b>在线</b><br>
+    gateway <b>在线</b><br>
+    记忆 11 条 · 提醒 2 待发
+  </div>
+</aside>
+
+<main>
+  <!-- 01 对话 -->
+  <section class="page on" id="p-chat">
+    <div class="pagehead"><h2>对话</h2><span class="sub">SSE · 会话连续 · 来源可溯</span></div>
+    <div id="chat">
+      <div id="feed">
+        <details class="ctx"><summary>ContextPack 已注入（当前时间 · 画像 · 相关记忆 2 条 · 待办 1）</summary>
+          <div style="padding-top:8px">2026-09-14 星期一 13:53 · 偏好:燕麦拿铁无糖 · 相关:20260914043333 咖啡偏好 · 待发:体检提醒 09-15 08:00</div>
+        </details>
+        <div class="msg"><div class="who"><b>你</b> · 13:52</div><div class="body">记住：周五要交开题报告初稿</div></div>
+        <div class="msg me"><div class="who">yiA · 13:52</div><div class="body">已存好 ✅ 条目 <span style="font-family:var(--mono);font-size:12px">20260914135201-k7x9mf</span>，已自动关联「论文进度」2 条旧记忆。</div></div>
+        <div class="msg"><div class="who"><b>你</b> · 13:53</div><div class="body">我咖啡喝什么来着？</div></div>
+        <div class="msg me"><div class="who">yiA · 13:53</div><div class="body">燕麦拿铁，无糖。<span class="src">来源 20260914043333-vnpddz · 画像偏好区亦同步</span></div></div>
+      </div>
+      <div class="composer">
+        <input id="ci" placeholder="存一句话 / 问一件事 / 设个提醒…" autocomplete="off">
+        <button onclick="send()">记</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 记忆 -->
+  <section class="page" id="p-kb">
+    <div class="pagehead"><h2>记忆</h2><span class="sub">L2 知识库 · Markdown + 双向链接</span></div>
+    <div id="kb">
+      <div class="kb-bar">
+        <input id="q" placeholder="检索…（BM25）" oninput="filterCards(this.value)">
+        <span class="count" id="cnt">11 条目</span>
+      </div>
+      <div class="cards" id="cards"></div>
+    </div>
+  </section>
+
+  <!-- 03 提醒 -->
+  <section class="page" id="p-rem">
+    <div class="pagehead"><h2>提醒</h2><span class="sub">唯一触发者：调度守护 · 错过补发</span></div>
+    <div id="rem">
+      <div class="rhead">按触发时间排序 · 已完成保留 7 天</div>
+      <div class="rrow">
+        <div class="when"><b>09-15 08:00</b><br>明天 周二</div>
+        <div class="what">体检提醒：今天要去体检</div>
+        <span class="chan">微信</span><button onclick="done(this)">完成</button>
+      </div>
+      <div class="rrow">
+        <div class="when"><b>每天 09:30</b><br>重复</div>
+        <div class="what">站会 · 汇报昨日进展</div>
+        <span class="chan">微信</span><button onclick="done(this)">完成</button>
+      </div>
+      <div class="rrow done">
+        <div class="when">09-14 12:39<br>已触发</div>
+        <div class="what">E2E 体检：最终验证</div>
+        <span class="chan">微信</span><button onclick="this.closest('.rrow').remove()">删除</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 图谱 -->
+  <section class="page" id="p-graph">
+    <div class="pagehead"><h2>图谱</h2><span class="sub">条目关联 · 可拖拽 · M7 用 Cytoscape 重写</span></div>
+    <div id="graph-wrap">
+      <canvas id="gc"></canvas>
+      <div class="glegend">
+        <div><i style="background:#26221b"></i>记忆条目</div>
+        <div><i style="background:#b5391e"></i>核心枢纽（关联≥3）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 微信 -->
+  <section class="page" id="p-wx">
+    <div class="pagehead"><h2>微信</h2><span class="sub">OpenClaw Gateway · 官方插件 · 仅私聊</span></div>
+    <div id="wx">
+      <div class="wx-grid">
+        <div class="wx-block">
+          <h3>通道状态</h3>
+          <dl class="kv">
+            <dt>bot 账号</dt><dd class="ok">7f4e0fbc81e2-im-bot · running</dd>
+            <dt>发送账号</dt><dd class="ok">account 已绑定 ✓</dd>
+            <dt>推送目标</dt><dd>o9cq809k…wrLS8@im.wechat</dd>
+            <dt>配对白名单</dt><dd>2 人 · 无待批请求</dd>
+            <dt>端到端</dt><dd class="ok">12:39 送达 ✓（守护→网关→手机）</dd>
+          </dl>
+          <button class="wx-btn danger" onclick="toast('已登出全部账号，等待扫码…')">换绑微信</button>
+          <button class="wx-btn" onclick="toast('测试消息已发往手机')">发测试消息</button>
+        </div>
+        <div class="wx-block">
+          <h3>扫码登录</h3>
+          <div class="wx-qr">
+            <div class="frame"></div>
+            <p>用 bot 微信扫一扫<br>登录后账号 id 自动绑定，旧账号自动登出</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="drawer"><button class="close" onclick="drawer(false)">✕</button><div id="dbody"></div></div>
+
+<script>
+/* ── 导航 ── */
+const nav = document.getElementById('nav');
+nav.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  nav.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.p));
+  if (b.dataset.p === 'graph') resizeGraph();
+});
+
+/* ── 对话（原型：本地回声演示） ── */
+function send() {
+  const i = document.getElementById('ci'), t = i.value.trim(); if (!t) return;
+  i.value = '';
+  const feed = document.getElementById('feed'), now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const mk = (cls, who, body) => {
+    const d = document.createElement('div'); d.className = 'msg ' + cls;
+    d.innerHTML = `<div class="who">${who} · ${hh}</div><div class="body">${body}</div>`;
+    feed.appendChild(d); feed.scrollTop = feed.scrollHeight;
+  };
+  mk('', '<b>你</b>', t);
+  setTimeout(() => mk('me', 'yiA', /^(记住|存)/.test(t)
+    ? `已存好 ✅ 条目 <span style="font-family:var(--mono);font-size:12px">${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${hh.replace(':','')}-proto</span>`
+    : /提醒/.test(t) ? '提醒已建 ⏰ 到点推送到微信（原型演示，未真实入队）'
+    : '（M6 接入 SSE 后由 yiA 大脑回答 · 原型仅回声）'), 450);
+}
+document.getElementById('ci').addEventListener('keydown', e => e.key === 'Enter' && send());
+
+/* ── 记忆卡 ── */
+const ENTRIES = [
+  { id:'20260914043333-vnpddz', t:'咖啡偏好', x:'燕麦拿铁，无糖。2026-09-14 E2E 体检时由"少糖"精炼为"无糖"。', tags:['偏好','咖啡'], links:2 },
+  { id:'20260911125250-dffo4q', t:'yiA M2 记忆完整功能落地', x:'L1 画像 + L3 会话索引(FTS5) + 覆盖率门控召回 + ContextPack 注入 + 自动关联(双向链接)。', tags:['yiA','M2'], links:4 },
+  { id:'20260914043000-a1b2c3', t:'开题报告初稿', x:'周五交。大纲：背景/相关工作/方法/实验设计。关联「论文进度」。', tags:['论文','待办'], links:1 },
+  { id:'20260912091000-d4e5f6', t:'微信换绑事故复盘', x:'根因：插件无 CLI logout 致双账号并存 + 发送未带 accountId。修复：凭据文件移除法 + 配置自动绑定。', tags:['yiA','M4','复盘'], links:3 },
+  { id:'20260913082000-g7h8i9', t:'GLM-5.3 上下文规格', x:'128K~200K tokens 量级，以智谱官方为准；满时 pi 自动压缩为摘要。', tags:['模型','知识'], links:1 },
+  { id:'20260912200000-j1k2l3', t:'周日徒步路线', x:'鹫峰→阳台山穿越，全程 11km，累积爬升 800m。带 1.5L 水。', tags:['户外'], links:0 },
+  { id:'20260914090000-m4n5o6', t:'开源检查清单', x:'README 双平台部署 ✓ LICENSE MIT ✓ 个人信息零残留 ✓ git 历史压缩单提交 ✓', tags:['开源','清单'], links:1 },
+];
+const cardsEl = document.getElementById('cards');
+function renderCards(list) {
+  cardsEl.innerHTML = list.map((e,i) => `
+    <div class="card tilt" onclick="openCard('${e.id}')">
+      ${e.links >= 3 ? '<span class="pin">枢纽 ' + e.links + ' 链</span>' : ''}
+      <h3>${e.t}</h3><p>${e.x}</p>
+      <div class="meta"><span>${e.id}</span><span>↔ ${e.links}</span><span class="tag">${e.tags.join(' · ')}</span></div>
+    </div>`).join('');
+  document.getElementById('cnt').textContent = list.length + ' / ' + ENTRIES.length + ' 条目';
+}
+function filterCards(q) {
+  q = q.trim().toLowerCase();
+  renderCards(q ? ENTRIES.filter(e => (e.t + e.x + e.tags.join()).toLowerCase().includes(q)) : ENTRIES);
+}
+function openCard(id) {
+  const e = ENTRIES.find(x => x.id === id);
+  document.getElementById('dbody').innerHTML = `
+    <h3>${e.t}</h3><div class="id">${e.id}</div>
+    <div class="fm">---<br>id: ${e.id}<br>title: ${e.t}<br>tags: ${JSON.stringify(e.tags)}<br>links: ${e.links} 条双向<br>created: ${e.id.slice(0,8)}<br>---</div>
+    <div class="txt">${e.x}</div>
+    <div class="acts"><button class="wx-btn" onclick="toast('编辑（M6 实现）')">编辑</button>
+    <button class="wx-btn danger" onclick="toast('已删除（原型演示）');drawer(false)">删除</button></div>`;
+  drawer(true);
+}
+function drawer(on) { document.getElementById('drawer').classList.toggle('on', on); }
+renderCards(ENTRIES);
+
+/* ── 提醒 ── */
+function done(btn) { btn.closest('.rrow').classList.add('done'); btn.textContent = '已发'; btn.disabled = true; toast('已标记完成'); }
+
+/* ── 图谱：极简力导向（可拖拽） ── */
+const cv = document.getElementById('gc'), cx = cv.getContext('2d');
+let nodes = ENTRIES.map((e,i) => ({ id:e.id, deg:e.links, x:Math.cos(i/7*6.28)*160+300, y:Math.sin(i/7*6.28)*120+200, vx:0, vy:0, hold:false }));
+let edges = []; nodes.forEach((a,i) => nodes.slice(i+1).forEach(b => { if ((a.deg + b.deg) % 3 === 0 || (a.id.slice(-1) === b.id.slice(-1))) edges.push([a,b]); }));
+function resizeGraph() {
+  const w = cv.parentElement; cv.width = w.clientWidth; cv.height = w.clientHeight;
+  nodes.forEach(n => { n.x = cv.width/2 + (n.x - 300); n.y = cv.height/2 + (n.y - 200); });
+}
+new ResizeObserver(resizeGraph).observe(document.getElementById('graph-wrap'));
+let drag = null;
+cv.addEventListener('pointerdown', e => { const r = cv.getBoundingClientRect(); drag = nodes.find(n => Math.hypot(n.x-(e.clientX-r.left), n.y-(e.clientY-r.top)) < 16); if (drag) { drag.hold = true; cv.style.cursor='grabbing'; } });
+cv.addEventListener('pointermove', e => { if (drag) { const r = cv.getBoundingClientRect(); drag.x = e.clientX-r.left; drag.y = e.clientY-r.top; } });
+addEventListener('pointerup', () => { if (drag) { drag.hold = false; drag = null; cv.style.cursor='grab'; } });
+(function loop() {
+  const cxm = cv.width/2, cym = cv.height/2;
+  nodes.forEach(n => {
+    if (n.hold) return;
+    n.vx += (cxm - n.x) * .0012; n.vy += (cym - n.y) * .0012;
+    nodes.forEach(m => { if (m === n) return; const dx = n.x-m.x, dy = n.y-m.y, d2 = dx*dx+dy*dy || 1; if (d2 < 26000) { n.vx += dx/d2*30; n.vy += dy/d2*30; } });
+    n.vx *= .86; n.vy *= .86; n.x += n.vx; n.y += n.vy;
+  });
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.strokeStyle = '#c9bd9f'; cx.lineWidth = 1;
+  edges.forEach(([a,b]) => { cx.beginPath(); cx.moveTo(a.x,a.y); cx.lineTo(b.x,b.y); cx.stroke(); });
+  nodes.forEach(n => {
+    cx.fillStyle = n.deg >= 3 ? '#b5391e' : '#26221b';
+    cx.beginPath(); cx.arc(n.x, n.y, n.deg >= 3 ? 9 : 5.5, 0, 7); cx.fill();
+  });
+  requestAnimationFrame(loop);
+})();
+
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = '◎ ' + msg;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2600);
+}
+</script>
+</body>
+</html>
