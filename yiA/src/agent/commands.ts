@@ -290,9 +290,11 @@ async function editTargetPeer(ctx: any, root: string): Promise<void> {
     return;
   }
   const cfg = JSON.parse(readFileSync(file, "utf8"));
-  const input = await ctx.ui.input("新的推送目标（微信 id，形如 xxx@im.wechat）：", cfg.targetPeer);
-  if (!input || !input.includes("@im.wechat")) {
-    ctx.ui.notify("未修改（取消或格式不对，需要 xxx@im.wechat）", "warning");
+  const input = await ctx.ui.input("新的推送目标（微信 id，形如 oXXXX...@im.wechat）：", cfg.targetPeer);
+  // 真实 peer id 是长不透明串（o+20位左右）；填昵称会静默推送失败
+  //（ret=-3 invalid arguments —— 2026-09-14 E2E 体检事故：填了昵称“瓜皮”）
+  if (!input || !/^o[A-Za-z0-9_-]{15,}@im\.wechat$/.test(input.trim())) {
+    ctx.ui.notify("未修改：这不是微信 peer id（不能用昵称！查法：/wechat 状态里的对话方，或网关日志 chatId=）", "warning");
     return;
   }
   cfg.targetPeer = input.trim();
@@ -300,12 +302,15 @@ async function editTargetPeer(ctx: any, root: string): Promise<void> {
   ctx.ui.notify(`推送目标已更新：${cfg.targetPeer}`, "info");
 }
 
-/** 从 channels status 输出解析已登录的微信 bot 账号 id（跳过 default 占位） */
+/** 从 channels status 输出解析已登录的微信 bot 账号 id。
+ *  只认 configured（排除 "not configured, stopped" 僵尸条目，
+ *  否则会把已停用账号写进发送配置 → 推送报 account not configured —— 2026-09-14 E2E 体检事故） */
 function parseWeixinAccounts(statusOut: string): string[] {
   const ids = [];
-  for (const m of statusOut.matchAll(/openclaw-weixin\s+([^\s:]+):/g)) {
+  for (const m of statusOut.matchAll(/openclaw-weixin\s+([^\s:]+):\s*(.+)/g)) {
     const id = m[1];
-    if (id && id !== "default") ids.push(id);
+    const state = m[2];
+    if (id && id !== "default" && !state.includes("not configured")) ids.push(id);
   }
   return ids;
 }
