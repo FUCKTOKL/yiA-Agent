@@ -67,8 +67,8 @@ yiA   # TUI；或 node yiA/scripts/chat-cli.ts < 无头自检
 ## 测试
 
 ```bash
-cd yiA && npm test        # 单元测试（node:test，无第三方依赖）
-npm run loadcheck         # 扩展加载自检
+npm test                # 单元测试（仓库根即可跑）
+npm run loadcheck       # 扩展加载自检（同样仓库根可跑）
 npm run bench             # 万条记忆检索基准
 ```
 

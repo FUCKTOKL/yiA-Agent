@@ -1,0 +1,13 @@
+{
+  "name": "yia-root",
+  "version": "0.5.0",
+  "private": true,
+  "description": "yiA——个人第二大脑助理（根：仅脚本转发，依赖与代码在 yiA/ 子包）",
+  "license": "MIT",
+  "scripts": {
+    "web": "npm --prefix yiA run web",
+    "test": "npm --prefix yiA test",
+    "loadcheck": "npm --prefix yiA run loadcheck",
+    "bench": "npm --prefix yiA run bench"
+  }
+}
