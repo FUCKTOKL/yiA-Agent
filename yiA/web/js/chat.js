@@ -72,10 +72,8 @@ chatScroll.addEventListener("click", (e) => {
   if (h && memIndex.some((m) => m.id === h.dataset.id)) openFocus(h.dataset.id);
 });
 
-/* 历史岛：runtime/chats/ 会话清单（含微信/CLI 通道的连续会话） */
-async function loadSessions() {
-  const { sessions } = await (await fetch("/api/status").then(() => ({ sessions: [] }))).catch(() => ({ sessions: [] }));
-  // ponytail: 会话清单接口暂缺（M6.1 加 GET /api/sessions），先展示当前 web 会话
+/* 历史岛：会话清单（ponytail: /api/sessions 接口 M6.1 再加，先展示当前 web 会话） */
+function loadSessions() {
   $("#histList").innerHTML = `<div class="hist-item glass-sub active"><h4>Web 会话</h4><div class="mono">runtime/chats/web.jsonl</div></div>`;
 }
 
