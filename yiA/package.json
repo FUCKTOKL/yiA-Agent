@@ -1,0 +1,17 @@
+{
+  "name": "yia",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types src/memory/l2/selfcheck.ts",
+    "test:unit": "node --test --experimental-strip-types \"tests/*.test.ts\"",
+    "loadcheck": "node --experimental-strip-types scripts/loadcheck.ts",
+    "bench": "node --experimental-strip-types scripts/bench.ts"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.85.1"
+  },
+  "version": "0.5.0",
+  "description": "yiA——个人第二大脑助理（Pi SDK 二次开发：记忆/提醒/微信）",
+  "license": "MIT"
+}

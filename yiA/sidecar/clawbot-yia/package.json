@@ -1,0 +1,16 @@
+{
+  "name": "@qj/openclaw-yia-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.mjs"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    }
+  },
+  "dependencies": {
+    "openclaw": "2026.8.1"
+  },
+  "description": "yiA brain as an OpenClaw CLI backend (WeChat via WSL)"
+}

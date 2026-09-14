@@ -1,0 +1,15 @@
+[Unit]
+Description=yiA scheduler daemon (reminders)
+After=openclaw-gateway.service
+
+[Service]
+Type=simple
+# __YIA_ROOT__ 由 provision.sh 安装时替换为实际仓库根（模板文件，勿直接使用）
+WorkingDirectory=__YIA_ROOT__
+ExecStart=/usr/bin/env node --experimental-strip-types __YIA_ROOT__/yiA/scripts/scheduler-daemon.ts
+Restart=always
+RestartSec=10
+Environment=NODE_NO_WARNINGS=1
+
+[Install]
+WantedBy=default.target

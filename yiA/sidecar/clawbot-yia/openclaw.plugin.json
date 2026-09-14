@@ -1,0 +1,17 @@
+{
+  "id": "yia-cli",
+  "name": "yiA CLI Backend",
+  "description": "Route WeChat messages to the yiA second-brain running in WSL",
+  "cliBackends": ["yia-cli"],
+  "setup": {
+    "cliBackends": ["yia-cli"],
+    "requiresRuntime": false
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}
