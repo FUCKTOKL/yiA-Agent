@@ -18,7 +18,6 @@ import { basename, dirname, join, resolve } from "node:path";
 import net from "node:net";
 import { homedir } from "node:os";
 import { L2Store } from "../src/memory/l2/store.ts";
-import { buildContextPack } from "../src/memory/context-pack.ts";
 import { L1Store } from "../src/memory/l1/profile.ts";
 import { L3Store } from "../src/memory/l3/sqlite-store.ts";
 import { JobStore } from "../src/scheduler/job-store.ts";
@@ -118,17 +117,24 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse): P
     });
   }
 
-  // ---- ContextPack（对话页折叠条） ----
+  // ---- ContextPack（前端契约：结构化字段 now/profile/recent/reminders，非拼接文本） ----
   if (path === "/api/context" && method === "GET") {
-    const pack = buildContextPack("", { l1, l2, l3 });
-    return json(res, { sections: pack ? pack.split(/\n(?=#)/).filter(Boolean) : [] });
+    const prof = l1.read();
+    return json(res, {
+      now: new Date().toLocaleString("zh-CN", { hour12: false }),
+      profile: Object.fromEntries(["identity", "preferences", "ongoing", "facts"].map((k) => [k, (prof as any)[k] ?? []])),
+      recent: l2.all().slice(-5).reverse().map((e) => ({ id: e.id, title: e.title })),
+      reminders: jobs.pending().map((j) => ({ id: j.id, at: j.at, title: j.title, channel: j.channel })),
+    });
   }
 
-  // ---- 记忆 ----
+  // ---- 记忆（前端契约：{ entries: [...] }，字段 created 对齐前端 yaml 展示） ----
   if (path === "/api/memory" && method === "GET") {
     const q = u.searchParams.get("q")?.trim() ?? "";
-    const hits = q ? l2.search(q, 20).map((h) => h.entry) : l2.all();
-    return json(res, hits.map((e) => ({ id: e.id, title: e.title, content: e.content, tags: e.tags, links: e.links, createdAt: e.createdAt })));
+    // search 返回平铺的 {…条目字段, score, coverage}，与 all() 同构，直接用
+    const hits: any[] = q ? l2.search(q, 20) : l2.all();
+    const entries = hits.map((e: any) => ({ id: e.id, title: e.title, content: e.content, tags: e.tags, links: e.links, created: e.createdAt ?? `${e.id.slice(0, 8)} ${e.id.slice(8, 14)}` }));
+    return json(res, { entries });
   }
   let m = path.match(/^\/api\/memory\/([\w-]+)$/);
   if (m && method === "POST") {
@@ -213,7 +219,7 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse): P
   }
 
   if (path === "/api/chat/history" && method === "GET") {
-    return json(res, chatHistory());
+    return json(res, { msgs: chatHistory() });
   }
 
   fail(res, "未知接口", 404);
