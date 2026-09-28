@@ -24,3 +24,13 @@
 .wx-actions{display:flex;gap:14px;align-items:center;margin-top:20px}
 .wx-feedback{font-family:var(--mono);font-size:12px;color:var(--ok);margin-left:4px;opacity:0;transition:opacity .3s}
 .wx-feedback.show{opacity:1}
+
+/* ===== 换绑向导 ===== */
+.rb-steps{display:flex;gap:6px;margin:14px 0 4px}
+.rb-step{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--chip-bg);color:var(--t3)}
+.rb-step.on{background:var(--nav-active);color:var(--t1);font-weight:600}
+.rb-pane{display:none;margin-top:10px}
+.rb-pane.show{display:block}
+.rb-qr{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:12px;padding:12px;
+  font-family:ui-monospace,monospace;font-size:10.5px;line-height:1.15;color:var(--t1);
+  white-space:pre;overflow:auto;max-height:260px;margin:10px 0}

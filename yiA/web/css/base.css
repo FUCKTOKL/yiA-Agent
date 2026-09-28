@@ -50,8 +50,8 @@ body.light .env::after{background:rgba(120,140,90,.22)}
 .brand{font-weight:600;font-size:17px;letter-spacing:.5px;margin-bottom:6px}
 .nav-btn{width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;
   background:transparent;display:flex;align-items:center;justify-content:center;
-  color:var(--t2);transition:background .3s var(--ease),color .3s}
-.nav-btn:hover{color:var(--t1)}
+  color:var(--t2);transition:background .15s ease,color .15s ease}
+.nav-btn:hover{background:var(--btn-sub);color:var(--t1)}
 .nav-btn.active{background:var(--nav-active);color:var(--t1)}
 .nav-btn svg{width:21px;height:21px}
 .rail-spacer{flex:1}

@@ -93,7 +93,7 @@
 
     <aside class="island glass hist-island">
       <div class="win-pad">
-        <div class="win-head"><h1 style="font-size:18px">会话</h1><div class="sub">runtime/chats/</div></div>
+        <div class="win-head"><h1 style="font-size:18px">会话</h1><div class="spacer"></div><button class="btn-glass" id="newChatBtn" style="padding:6px 12px;font-size:13px">＋ 新对话</button></div>
         <div class="hairline"></div>
         <div class="hist-list scroller" id="histList"></div>
         <div class="sub" style="padding:10px 2px;opacity:.6">微信 / Web 通道共用同一大脑，各会话独立连续</div>
@@ -186,14 +186,14 @@
           <div class="kv-row"><span class="k">token</span><span class="v" id="wxToken">…</span></div>
         </div>
         <div class="wx-card glass-sub">
-          <h3>扫码登录</h3>
+          <h3>换绑向导</h3>
           <div class="qr-wrap">
             <div class="qr-box">
               <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>
-              <span class="mono">扫码请在 TUI 完成</span>
+              <span class="mono">Web 端可直接换绑</span>
             </div>
-            <p class="qr-note">换绑含扫码交互流，Web MVP 不内置；在终端运行 <code>/wechat</code> 全自动引导</p>
+            <p class="qr-note">点「换绑微信」走五步向导：登出全部 → 扫码 → 配对 → 推送目标 → 重启网关（与 TUI /wechat 同一套后端操作）</p>
           </div>
         </div>
       </div>
@@ -281,13 +281,41 @@
   </div>
 </div>
 
-<!-- 换绑确认 -->
+<!-- 换绑向导 -->
 <div class="overlay" id="rebindOv">
-  <div class="modal-win glass">
-    <h3>换绑微信</h3>
-    <p>换绑含扫码交互流，请在终端 TUI 运行 <code>/wechat</code>（登出→扫码→配对→自动绑定，全程引导）。</p>
-    <div class="modal-ops">
-      <button class="btn-glass" data-close="rebindOv">知道了</button>
+  <div class="modal-win glass" style="width:640px">
+    <h3>换绑微信（五步向导）</h3>
+    <div class="rb-steps">
+      <span class="rb-step on">1 登出</span><span class="rb-step">2 扫码</span><span class="rb-step">3 配对</span><span class="rb-step">4 推送目标</span><span class="rb-step">5 重启</span>
+    </div>
+    <div class="rb-pane show">
+      <p>将登出全部已登录微信账号（凭据移入备份目录），然后用新号扫码。推送与对话都会切到新号。</p>
+      <p class="mono" id="rbLog1"></p>
+      <div class="modal-ops"><button class="btn-glass" data-close="rebindOv">取消</button><button class="btn-solid" id="rbStart">开始换绑</button></div>
+    </div>
+    <div class="rb-pane">
+      <p id="rbSt2">用微信扫码（二维码刷新中）：</p>
+      <pre id="rbQr" class="rb-qr"></pre>
+      <div class="modal-ops"><button class="btn-glass" data-close="rebindOv">中止</button></div>
+    </div>
+    <div class="rb-pane">
+      <p>用新个人号给 bot 发一条消息，然后刷新配对列表，输入配对码批准：</p>
+      <button class="btn-glass" id="rbPairRefresh">刷新配对列表</button>
+      <pre id="rbPairList" class="rb-qr" style="max-height:110px"></pre>
+      <div class="field" style="margin-top:10px"><label>配对码</label><input id="rbPairCode" placeholder="如 a3xk9"></div>
+      <div class="modal-ops"><button class="btn-glass" id="rbApprove">批准</button><span class="mono" id="rbPairMsg"></span><button class="btn-solid" id="rbTo4">下一步</button></div>
+    </div>
+    <div class="rb-pane">
+      <p>提醒推送到哪个微信（个人号 id，形如 <code>oxxxx…@im.wechat</code>，可在配对列表里看到）：</p>
+      <div class="field"><label>推送目标</label><input id="rbTarget" placeholder="o…@im.wechat"></div>
+      <div class="modal-ops"><span class="mono" id="rbTargetMsg"></span><button class="btn-solid" id="rbTargetSave">保存并进入重启</button></div>
+    </div>
+    <div class="rb-pane">
+      <p>重启网关使配置生效（约 5 秒）。</p>
+      <div class="modal-ops">
+        <button class="btn-solid" id="rbRestart">重启网关</button>
+        <button class="btn-glass" data-close="rebindOv" id="rbDone" hidden>完成 ✅</button>
+      </div>
     </div>
   </div>
 </div>

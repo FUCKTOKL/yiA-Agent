@@ -172,25 +172,8 @@ async function showMarkdown(
 }
 
 // ==================== /wechat 微信绑定工具 ====================
-
-/** 跑一条命令并收集输出（短命令） */
-function runCapture(cmd: string, args: string[], timeoutMs = 30_000): Promise<{ code: number | null; out: string }> {
-  return new Promise((resolve) => {
-    const p = spawn(cmd, args, { env: process.env });
-    let out = "";
-    const t = setTimeout(() => p.kill(), timeoutMs);
-    p.stdout.on("data", (d) => (out += d));
-    p.stderr.on("data", (d) => (out += d));
-    p.on("close", (code) => {
-      clearTimeout(t);
-      resolve({ code, out });
-    });
-    p.on("error", (e) => {
-      clearTimeout(t);
-      resolve({ code: null, out: String(e) });
-    });
-  });
-}
+// 核心操作（登出/网关控制/账号解析）在 src/channels/weixin-ops.ts，与 Web 端共用
+import { runCapture, parseWeixinAccounts, gatewayCtl, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPeer } from "../channels/weixin-ops.ts";
 
 /** 在全屏面板里跑长命令：实时流式显示输出（含二维码），ESC 中止；
  *  检测到验证码提示时行内输入，Enter 提交到子进程 stdin。返回退出码。 */
@@ -302,58 +285,13 @@ async function editTargetPeer(ctx: any, root: string): Promise<void> {
   ctx.ui.notify(`推送目标已更新：${cfg.targetPeer}`, "info");
 }
 
-/** 从 channels status 输出解析已登录的微信 bot 账号 id。
- *  只认 configured（排除 "not configured, stopped" 僵尸条目，
- *  否则会把已停用账号写进发送配置 → 推送报 account not configured —— 2026-09-14 E2E 体检事故） */
-function parseWeixinAccounts(statusOut: string): string[] {
-  const ids = [];
-  for (const m of statusOut.matchAll(/openclaw-weixin\s+([^\s:]+):\s*(.+)/g)) {
-    const id = m[1];
-    const state = m[2];
-    if (id && id !== "default" && !state.includes("not configured")) ids.push(id);
-  }
-  return ids;
-}
-
-/** 网关服务控制：openclaw 自带命令本身跨平台（Linux=systemd / macOS=launchd / Windows=schtasks），
- *  无需按平台分支（旧代码直接调 systemctl，Windows 不可用） */
-async function gatewayCtl(action: "stop" | "start" | "restart"): Promise<void> {
-  await runCapture("openclaw", ["gateway", action], 60_000);
-}
-
-/** 登出全部微信账号：停网关 → 凭据文件移入备份目录 → 起网关。
- *  注：weixin 插件不支持 `channels logout` CLI，删账号文件是唯一途径
- *  （凭据存在 ~/.openclaw/openclaw-weixin/accounts/<id>.{json,sync.json,context-tokens.json}）。 */
-async function logoutAllWeixin(ctx: any): Promise<string[]> {
-  const st = await runCapture("openclaw", ["channels", "status", "--probe"]);
-  const accounts = parseWeixinAccounts(st.out);
-  if (accounts.length === 0) return [];
-  await gatewayCtl("stop");
-  const dir = join(process.env.HOME || process.env.USERPROFILE || ".", ".openclaw/openclaw-weixin/accounts");
-  const backup = join(dir, ".removed-backup");
-  mkdirSync(backup, { recursive: true });
-  const moved: string[] = [];
-  for (const id of accounts) {
-    for (const suffix of [".json", ".sync.json", ".context-tokens.json"]) {
-      const f = join(dir, id + suffix);
-      if (existsSync(f)) {
-        renameSync(f, join(backup, `${id}${suffix}.${Date.now()}`));
-      }
-    }
-    moved.push(id);
-  }
-  await gatewayCtl("start");
-  await new Promise((r) => setTimeout(r, 5000));
-  return moved;
-}
-
 async function rebindWechat(ctx: any, root: string): Promise<void> {
   const ok = await ctx.ui.confirm("换绑微信", "将登出全部已登录微信账号并用新号扫码，继续？");
   if (!ok) return;
 
   // 1) 登出全部已登录账号（插件不支持 CLI logout，用凭据文件移除法；
   //    残留旧账号会导致双账号并存：旧号继续可用、推送发错号 —— 2026-09-14 事故）
-  const moved = await logoutAllWeixin(ctx);
+  const moved = await logoutAllWeixinAccounts((m) => ctx.ui.notify(m, "info"));
   if (moved.length > 0) ctx.ui.notify(`已登出：${moved.join(", ")}`, "info");
 
   // 2) 扫码登录（全屏显示二维码，流式刷新状态；如需验证码行内输入）
@@ -369,14 +307,10 @@ async function rebindWechat(ctx: any, root: string): Promise<void> {
   }
 
   // 3) 解析新账号 id 并写入配置（发送时指定 accountId，防多账号歧义）
-  const st3 = await runCapture("openclaw", ["channels", "status", "--probe"]);
-  const newAccounts = parseWeixinAccounts(st3.out);
   const file = join(root, "runtime/config/wechat.json");
-  if (newAccounts.length > 0 && existsSync(file)) {
-    const cfg = JSON.parse(readFileSync(file, "utf8"));
-    cfg.account = newAccounts[0];
-    writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", "utf8");
-    ctx.ui.notify(`发送账号已绑定：${newAccounts[0]}`, "info");
+  const boundAccount = await bindCurrentAccount(file);
+  if (boundAccount) {
+    ctx.ui.notify(`发送账号已绑定：${boundAccount}`, "info");
   }
 
   // 4) 配对：提示用新号发条消息，然后列出待批准项

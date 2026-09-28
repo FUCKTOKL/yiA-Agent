@@ -8,6 +8,10 @@ const ID_RE = /\b(\d{8}\d{6}-[a-z0-9]{4,8})\b/g; // 条目 id 形如 20260914135
 let memIndex = []; // id→{title,sum} 缓存，供引用芯片悬浮
 api.memory().then((d) => { memIndex = d.entries; }).catch(() => {});
 
+/** 当前会话：右岛可切换/新建，发送与历史都跟随 */
+let activeSession = "web";
+const fmtTs = (iso) => { try { return new Date(iso).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); } catch { return ""; } };
+
 const now = () => new Date().toTimeString().slice(0, 5);
 const linkIds = (html) =>
   html.replace(ID_RE, (id) => `<span class="hl" data-id="${id}">${id}</span>`);
@@ -22,10 +26,10 @@ function appendMsg(who, html, t = now()) {
 }
 
 async function loadHistory() {
-  const { msgs } = await api.chatHistory();
+  const { msgs } = await api.chatHistory(activeSession);
   if (msgs.length) {
     $("#chatEmpty").hidden = true; chatScroll.style.display = "";
-    for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t);
+    for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t ? m.t.slice(5, 16).replace("T", " ") : undefined);
   } else {
     $("#chatEmpty").hidden = false; chatScroll.style.display = "none";
   }
@@ -54,10 +58,10 @@ async function send() {
   appendMsg("ai", '<span style="opacity:.55">思考中…</span>');
   const think = chatScroll.lastElementChild;
   await api.chat(v, (evt, data) => {
-    if (evt === "done") { think.querySelector(".body").innerHTML = linkIds(esc(data.text)); }
+    if (evt === "done") { think.querySelector(".body").innerHTML = linkIds(esc(data.text)); loadSessions(); }
     if (evt === "error") { think.querySelector(".body").innerHTML = `<span style="color:#E26252">${esc(data.error)}</span>`; }
     chatScroll.scrollTop = chatScroll.scrollHeight;
-  });
+  }, activeSession);
   busy = false; sendBtn.disabled = false; chatInput.focus();
 }
 
@@ -72,10 +76,32 @@ chatScroll.addEventListener("click", (e) => {
   if (h && memIndex.some((m) => m.id === h.dataset.id)) openFocus(h.dataset.id);
 });
 
-/* 历史岛：会话清单（ponytail: /api/sessions 接口 M6.1 再加，先展示当前 web 会话） */
-function loadSessions() {
-  $("#histList").innerHTML = `<div class="hist-item glass-sub active"><h4>Web 会话</h4><div class="mono">runtime/chats/web.jsonl</div></div>`;
+/* 右岛：全部历史会话（首条用户消息命名），点击切换，可新建 */
+async function loadSessions() {
+  try {
+    const { sessions } = await api.sessions();
+    $("#histList").innerHTML = sessions.map((s) => `
+      <div class="hist-item glass-sub ${s.id === activeSession ? "active" : ""}" data-id="${s.id}">
+        <h4>${esc(s.title)}</h4>
+        <div class="mono">${s.src === "web" ? "Web" : "微信"} · ${s.count} 条 · ${esc(fmtTs(s.lastTs))}</div>
+      </div>`).join("") || '<div class="empty-block"><p>还没有会话</p></div>';
+    $$("#histList .hist-item").forEach((el) => {
+      el.onclick = async () => {
+        activeSession = el.dataset.id;
+        $$("#histList .hist-item").forEach((x) => x.classList.toggle("active", x === el));
+        await loadHistory().catch(() => {});
+      };
+    });
+  } catch (e) {
+    $("#histList").innerHTML = `<div class="empty-block"><p>会话列表加载失败：${esc(e.message)}</p></div>`;
+  }
 }
+$("#newChatBtn").onclick = () => {
+  activeSession = `web-${Date.now().toString(36)}`;
+  chatScroll.innerHTML = "";
+  $("#chatEmpty").hidden = false; chatScroll.style.display = "none";
+  loadSessions();
+};
 
 export async function initChat() {
   chatInput.disabled = false; sendBtn.disabled = false;

@@ -12,7 +12,7 @@
  */
 import http from "node:http";
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join, resolve } from "node:path";
 import net from "node:net";
@@ -23,7 +23,8 @@ import { L3Store } from "../src/memory/l3/sqlite-store.ts";
 import { JobStore } from "../src/scheduler/job-store.ts";
 import { ClawbotSender } from "../src/channels/clawbot/sender.ts";
 import { loadWechatConfig } from "../src/channels/wechat-config.ts";
-import { execFileSync } from "node:child_process";
+import { runCapture, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPeer } from "../src/channels/weixin-ops.ts";
+import { execFileSync, spawn } from "node:child_process";
 import { sessionFileFor } from "./chat-cli.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -81,9 +82,9 @@ function daemonState(): string {
   } catch { return "offline"; }
 }
 
-/** web 会话历史 → 前端格式 [{who, text, t}] */
-function chatHistory(): { who: string; text: string; t: string }[] {
-  const file = sessionFileFor(WEB_SESSION, ROOT);
+/** 会话历史 → 前端格式 [{who, text, t}]（可指定 session，缺省 web） */
+function chatHistory(sessionId = "web"): { who: string; text: string; t: string }[] {
+  const file = sessionFileFor(sessionId, ROOT);
   if (!existsSync(file)) return [];
   const out: { who: string; text: string; t: string }[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
@@ -184,17 +185,101 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse): P
     } catch (e) { return fail(res, `推送失败：${String(e).slice(0, 200)}`, 502); }
   }
 
-  // ---- 对话（SSE） ----
+  // ---- 换绑向导（Web 版 /wechat）：分步接口，前端驱动 ----
+  if (path === "/api/wechat/rebind/logout" && method === "POST") {
+    const moved = await logoutAllWeixinAccounts();
+    return json(res, { ok: true, moved });
+  }
+  if (path === "/api/wechat/rebind/qr" && method === "POST") {
+    // SSE：扫码登录，流式转发终端二维码（qrcode-terminal 输出的 ASCII 块）
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    sse(res, "start", {});
+    const p = spawn("openclaw", ["channels", "login", "--channel", "openclaw-weixin"], { env: process.env });
+    let buf = "";
+    p.stdout.on("data", (d: Buffer) => {
+      buf = (buf + d.toString()).split("\n").slice(-40).join("\n"); // 只保留末尾帧（QR 会刷新）
+      sse(res, "qr", { text: buf });
+    });
+    p.stderr.on("data", (d: Buffer) => sse(res, "qr", { text: d.toString().slice(-800) }));
+    p.on("close", async (code: number | null) => {
+      if (code === 0) {
+        const account = await bindCurrentAccount(join(ROOT, "runtime/config/wechat.json"));
+        sse(res, "done", { account });
+      } else {
+        sse(res, "error", { error: `登录进程退出（码 ${code}）` });
+      }
+      res.end();
+    });
+    p.on("error", (e: Error) => { sse(res, "error", { error: String(e) }); res.end(); });
+    return;
+  }
+  if (path === "/api/wechat/rebind/pairing" && method === "GET") {
+    const r = await runCapture("openclaw", ["pairing", "list", "openclaw-weixin"]);
+    return json(res, { text: r.out.trim() });
+  }
+  if (path === "/api/wechat/rebind/approve" && method === "POST") {
+    const { code } = await readBody(req);
+    if (!code?.trim()) return fail(res, "code 必填");
+    const r = await runCapture("openclaw", ["pairing", "approve", "openclaw-weixin", String(code).trim()]);
+    return json(res, { ok: r.code === 0, text: r.out.trim() });
+  }
+  if (path === "/api/wechat/rebind/target" && method === "POST") {
+    const { peer } = await readBody(req);
+    if (!peer || !validWechatPeer(String(peer))) return fail(res, "微信 id 格式不对（应为 o…@im.wechat，可从配对列表或网关日志获取）");
+    const file = join(ROOT, "runtime/config/wechat.json");
+    const cfg = JSON.parse(readFileSync(file, "utf8"));
+    cfg.targetPeer = String(peer).trim();
+    writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+    return json(res, { ok: true });
+  }
+  if (path === "/api/wechat/rebind/restart" && method === "POST") {
+    const { gatewayCtl } = await import("../src/channels/weixin-ops.ts");
+    await gatewayCtl("restart");
+    return json(res, { ok: true });
+  }
+
+  // ---- 会话列表（对话页右岛）：runtime/chats/*.jsonl，标题取首条用户消息 ----
+  if (path === "/api/sessions" && method === "GET") {
+    const dir = join(ROOT, "runtime/chats");
+    const out: { id: string; title: string; count: number; lastTs: string; src: string }[] = [];
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir)) {
+        if (!f.endsWith(".jsonl")) continue;
+        const id = f.replace(".jsonl", "");
+        let title = "", count = 0, lastTs = "";
+        for (const line of readFileSync(join(dir, f), "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const d = JSON.parse(line);
+            if (d.timestamp) lastTs = d.timestamp;
+            if (d.type !== "message" || d.message?.role !== "user") continue;
+            const text = (Array.isArray(d.message.content) ? d.message.content : [])
+              .filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+            // 去掉微信通道注入的 ContextPack 噪声头，取真实用户语句
+            const clean = text.replace(/Conversation info:[\s\S]*?```\n/, "").replace(/^⟦[^⟧]*⟧\s*/, "").replace(/^\[[\w :,+GMT-]*\]\s*/, "").replace(/[\n\r]/g, " ").trim();
+            count++;
+            if (!title && clean) title = clean.slice(0, 26);
+          } catch { /* 坏行跳过 */ }
+        }
+        out.push({ id, title: title || "（无标题）", count, lastTs, src: id === "web" || id.startsWith("web-") ? "web" : "wechat" });
+      }
+    }
+    out.sort((a, b) => (a.lastTs < b.lastTs ? 1 : -1));
+    return json(res, { sessions: out });
+  }
+
+  // ---- 对话（SSE，可指定 session；缺省 web） ----
   if (path === "/api/chat" && method === "POST") {
-    const { text } = await readBody(req);
+    const { text, session } = await readBody(req);
     if (!text?.trim()) return fail(res, "text 必填");
     if (chatBusy) return fail(res, "上一条还在处理中", 429);
     chatBusy = true;
     res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     sse(res, "start", {});
     try {
-      // 与 chat-cli 相同机制：web 会话文件连续复用
-      const file = sessionFileFor(WEB_SESSION, ROOT);
+      // 与 chat-cli 相同机制：会话文件连续复用
+      const sessionId = typeof session === "string" && /^[\w-]{1,64}$/.test(session) ? session : "web";
+      const file = sessionFileFor(sessionId, ROOT);
       const reused = existsSync(file);
       const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(ROOT);
       const { session } = await createAgentSession({ cwd: ROOT, agentDir: AGENT_DIR, sessionManager });
@@ -219,7 +304,9 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse): P
   }
 
   if (path === "/api/chat/history" && method === "GET") {
-    return json(res, { msgs: chatHistory() });
+    const sid = u.searchParams.get("session");
+    const sessionId = sid && /^[\w-]{1,64}$/.test(sid) ? sid : "web";
+    return json(res, { msgs: chatHistory(sessionId) });
   }
 
   fail(res, "未知接口", 404);
@@ -263,6 +350,12 @@ const server = http.createServer((req, res) => {
     res.end("404");
   }
 });
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`yiA Web 已启动：http://127.0.0.1:${PORT}（仅本机可访问；Ctrl+C 停止）`);
-});
+const isEntry = (() => {
+  try { return resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url); } catch { return false; }
+})();
+
+if (isEntry) {
+  server.listen(PORT, "127.0.0.1", () => {
+    console.log(`yiA Web 已启动：http://127.0.0.1:${PORT}（仅本机可访问；Ctrl+C 停止）`);
+  });
+}
