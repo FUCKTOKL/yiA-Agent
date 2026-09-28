@@ -39,9 +39,14 @@ body.light .env::after{background:rgba(120,140,90,.22)}
 }
 
 /* 嵌套玻璃去二次模糊：玻璃岛内的子玻璃层 backdrop-filter 会重复采样父层已模糊背景，
-   hover 重绘时产生色差伪影（会话/记忆行、搜索框、状态浮层均命中此规则） */
+   hover 重绘时产生色差伪影（会话/记忆行、搜索框、状态浮层均命中此规则）；
+   同时补偿底色——原 .10 叠在父层 .14 上合成 .23，比岛底亮一档星“色差”，
+   压到 .06 后合成 ≈ .19，仅保留子层应有的微抬升 */
 .glass .glass-sub, .glass-sub .glass-sub, .glass .glass, .glass-sub .glass{
-  -webkit-backdrop-filter:none;backdrop-filter:none
+  -webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.06)
+}
+body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
+  background:rgba(43,38,32,.04)
 }
 
 /* ===== 滚动条 ===== */
