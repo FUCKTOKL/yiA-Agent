@@ -29,7 +29,7 @@ async function loadHistory() {
   const { msgs } = await api.chatHistory(activeSession);
   if (msgs.length) {
     $("#chatEmpty").hidden = true; chatScroll.style.display = "";
-    for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t ? m.t.slice(5, 16).replace("T", " ") : undefined);
+    for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t ? fmtTs(m.t) : undefined);
   } else {
     $("#chatEmpty").hidden = false; chatScroll.style.display = "none";
   }

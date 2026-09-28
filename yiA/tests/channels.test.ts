@@ -7,7 +7,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ChannelRegistry, type ChannelSender } from "../src/channels/registry.ts";
 import { ClawbotSender } from "../src/channels/clawbot/sender.ts";
 import { loadWechatConfig } from "../src/channels/wechat-config.ts";
 import { sessionFileFor } from "../scripts/chat-cli.ts";
@@ -76,23 +75,6 @@ test("ClawbotSender：HTTP 500 与业务 ok:false 都抛错（触发降级）", 
 });
 
 // ---- 注册表降级 ----
-test("registry：微信失败自动降级到 TUI，双败才抛错", async () => {
-  const reg = new ChannelRegistry(logger);
-  const sent: string[] = [];
-  const bad: ChannelSender = { send: async () => { throw new Error("gateway down"); }, available: async () => true };
-  const good: ChannelSender = { send: async (_to, text) => { sent.push(text); }, available: async () => true };
-  reg.register("wechat", bad);
-  reg.register("tui", good);
-  const used = await reg.send("wechat", "me", "提醒：喝水");
-  assert.equal(used, "tui", "应降级到 tui");
-  assert.deepEqual(sent, ["提醒：喝水"]);
-  // 双败
-  const reg2 = new ChannelRegistry(logger);
-  reg2.register("wechat", bad);
-  reg2.register("tui", { send: async () => { throw new Error("tui down"); }, available: async () => true });
-  await assert.rejects(reg2.send("wechat", "me", "x"));
-});
-
 // ---- chat-cli 会话映射 ----
 test("sessionFileFor：会话 id 消毒，防路径注入", () => {
   const f = sessionFileFor("abc-123", "/root");

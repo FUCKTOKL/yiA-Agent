@@ -45,3 +45,15 @@ export function initShell() {
     else statusPop.classList.remove("show");
   });
 }
+
+/* ===== 启动入口（原 main.js 并入，减一层转发；动态 import 避免环） ===== */
+const { initChat } = await import("./chat.js");
+const { initMemory } = await import("./memory.js");
+const { initReminders } = await import("./reminders.js");
+const { initWechat } = await import("./wechat.js");
+initShell();
+initChat();
+initMemory();
+initReminders();
+initWechat();
+refreshStatus();

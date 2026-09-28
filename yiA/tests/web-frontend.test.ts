@@ -59,5 +59,5 @@ test("index.html 覆盖全部 js 顶层引用的 id（防断链复发）", () =>
 });
 
 test("全部模块可在 DOM 桩下加载（顶层无异常）", async () => {
-  await import(join(webDir, "js", "main.js"));
+  await import(join(webDir, "js", "app.js"));
 });

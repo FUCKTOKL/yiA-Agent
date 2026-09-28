@@ -1,7 +1,7 @@
 /**
- * Web 会话：chat-cli 同款无头会话，供 web-server 复用（web.jsonl 连续）。
- * 与 chat-cli 的差别：会话常驻内存（不每条消息建/销毁 agent），多轮更快；
- * 每轮结束后把 pi 会话文件同步到 runtime/chats/web.jsonl（与其他通道同一套归档格式）。
+ * Web 会话：chat-cli 同款无头会话，供 web-server 复用（runtime/chats/<session>.jsonl 连续）。
+ * 与 chat-cli 的差别：会话常驻内存（不每条消息建/销毁 agent），多轮更快。
+ * 支持多会话（Web 会话切换/新建；缺省 "web"），按 session id 缓存。
  */
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -13,18 +13,26 @@ interface WebSession {
   dispose(): void;
 }
 
-let cached: WebSession | null = null;
+/** 会话 id 白名单（防路径注入；与 chat-cli sessionFileFor 同规则） */
+function safeId(session: string): string {
+  return session.replace(/[^\w-]/g, "").slice(0, 64) || "web";
+}
 
-export async function webChat(text: string, root: string, agentDir: string, logger: Logger): Promise<string> {
-  if (!cached) {
-    const file = join(root, "runtime", "chats", "web.jsonl");
+const cache = new Map<string, WebSession>();
+
+export async function webChat(text: string, root: string, agentDir: string, logger: Logger, session = "web"): Promise<string> {
+  const sid = safeId(session);
+  let s = cache.get(sid);
+  if (!s) {
+    const file = join(root, "runtime", "chats", `${sid}.jsonl`);
     const reused = existsSync(file);
+    // 关键：sessionManager 必须传进 createAgentSession，否则会话落在 pi 默认目录、不续档
     const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(root);
-    const { session } = await createAgentSession({ cwd: root, agentDir });
-    cached = {
+    const { session } = await createAgentSession({ cwd: root, agentDir, sessionManager });
+    s = {
       async prompt(t: string) {
         await session.prompt(t);
-        // 同步归档（首次新建时 pi 的会话文件在默认目录，复制到映射路径）
+        // 首次新建：把 pi 默认目录的会话文件复制到映射路径
         if (!reused && session.sessionFile) {
           mkdirSync(dirname(file), { recursive: true });
           copyFileSync(session.sessionFile, file);
@@ -36,9 +44,10 @@ export async function webChat(text: string, root: string, agentDir: string, logg
           .map((c: any) => c.text)
           .join("\n");
       },
-      dispose() { session.dispose(); cached = null; },
+      dispose() { session.dispose(); cache.delete(sid); },
     };
-    logger.info("web 会话建立", { reused });
+    cache.set(sid, s);
+    logger.info("web 会话建立", { session: sid, reused });
   }
-  return cached.prompt(text);
+  return s.prompt(text);
 }

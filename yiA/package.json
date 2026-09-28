@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test --experimental-strip-types \"tests/*.test.ts\"",
-    "test:unit": "node --test --experimental-strip-types \"tests/*.test.ts\"",
     "loadcheck": "node --experimental-strip-types scripts/loadcheck.ts",
     "bench": "node --experimental-strip-types scripts/bench.ts",
     "selfcheck": "node --experimental-strip-types src/memory/l2/selfcheck.ts",

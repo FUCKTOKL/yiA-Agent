@@ -7,7 +7,7 @@
  *
  * ponytail: 当前每次消息一个 HTTP 请求；后续量大可换 WS 长连接复用。
  */
-import type { ChannelSender } from "../registry.ts";
+
 import type { Logger } from "../logger.ts";
 import type { WechatConfig } from "../wechat-config.ts";
 

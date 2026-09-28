@@ -23,9 +23,9 @@
  *   /*                          → 静态文件 yiA/web/
  */
 import { createServer, type Server } from "node:http";
-import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import net from "node:net";
 
 import { L2Store } from "../memory/l2/store.ts";
@@ -33,6 +33,7 @@ import { JobStore } from "../scheduler/job-store.ts";
 import { L1Store } from "../memory/l1/profile.ts";
 import { loadWechatConfig, type WechatConfig } from "../channels/wechat-config.ts";
 import { ClawbotSender } from "../channels/clawbot/sender.ts";
+import { runCapture, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPeer, gatewayCtl } from "../channels/weixin-ops.ts";
 import { Logger } from "../logger.ts";
 
 export interface YiaServerDeps {
@@ -81,7 +82,7 @@ export function createYiaServer(deps: YiaServerDeps): Server {
     join(root, "runtime", "scheduler", "jobs.json"),
     join(root, "runtime", "scheduler", "runs.jsonl"),
   );
-  const l1 = new L1Store(join(root, "runtime", "profile.json"));
+  const l1 = new L1Store(join(root, "runtime", "l1", "profile.json")); // 注意：实际路径在 l1/ 子目录
   const wcfg: WechatConfig | null = loadWechatConfig(root);
   const wechat = wcfg ? new ClawbotSender(wcfg, logger) : null;
   const webDir = resolve(root, "yiA", "web");
@@ -92,6 +93,29 @@ export function createYiaServer(deps: YiaServerDeps): Server {
   };
   const body = (req: any): Promise<any> =>
     new Promise((r) => { let b = ""; req.on("data", (c: Buffer) => (b += c)); req.on("end", () => { try { r(b ? JSON.parse(b) : {}); } catch { r(null); } }); });
+  const sse = (res: any, event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  /** 同一时刻只跑一条对话（agent 会话非并发安全） */
+  let chatBusy = false;
+
+  /** pi 会话 jsonl → 前端格式 [{who,text,t}]（多会话共用） */
+  const historyOf = (sid: string): { who: string; text: string; t: string }[] => {
+    const file = join(root, "runtime", "chats", `${sid}.jsonl`);
+    const out: { who: string; text: string; t: string }[] = [];
+    if (!existsSync(file)) return out;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const d = JSON.parse(line);
+        if (d.type !== "message" || !d.message) continue;
+        const role = d.message.role;
+        if (role !== "user" && role !== "assistant") continue;
+        const text = (Array.isArray(d.message.content) ? d.message.content : [])
+          .filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+        if (text) out.push({ who: role === "user" ? "user" : "ai", text, t: d.timestamp ?? "" });
+      } catch { /* 跳过损坏行 */ }
+    }
+    return out.slice(-40);
+  };
 
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -126,8 +150,10 @@ export function createYiaServer(deps: YiaServerDeps): Server {
 
         if (path === "/api/memory" && req.method === "GET") {
           const q = url.searchParams.get("q")?.trim() ?? "";
-          // search 返回的即是展平条目（含 score 字段，前端不敏感）；无 q 时全量
-          const entries = q ? l2.search(q, 50) : l2.all();
+          // search 返回的即是展平条目（含 score 字段，前端不敏感）；无 q 时全量；
+          // created 从 id 时间戳兑底（search 的 Doc 不带 createdAt，前端 yaml 展示用）
+          const raw: any[] = q ? l2.search(q, 50) : l2.all();
+          const entries = raw.map((e) => ({ ...e, created: e.createdAt ?? `${e.id.slice(0, 8)} ${e.id.slice(8, 14)}` }));
           return json(res, 200, { entries });
         }
         let m = path.match(/^\/api\/memory\/([\w-]+)$/);
@@ -180,32 +206,112 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           return json(res, 200, { ok: true, at: new Date().toISOString() });
         }
 
-        if (path === "/api/chat/history" && req.method === "GET") {
-          const file = join(root, "runtime", "chats", "web.jsonl");
-          const msgs: { who: string; text: string; t: string }[] = [];
-          if (existsSync(file)) {
-            for (const line of readFileSync(file, "utf8").split("\n")) {
-              if (!line.trim()) continue;
-              try { msgs.push(JSON.parse(line)); } catch { /* 跳过损坏行 */ }
+        // ── 换绑向导（Web 版 /wechat，与 TUI 同一套 weixin-ops）──
+        if (path === "/api/wechat/rebind/logout" && req.method === "POST") {
+          const moved = await logoutAllWeixinAccounts();
+          return json(res, 200, { ok: true, moved });
+        }
+        if (path === "/api/wechat/rebind/qr" && req.method === "POST") {
+          // SSE：扫码登录，流式转发终端二维码（qrcode-terminal 的 ASCII 块）
+          res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+          sse(res, "start", {});
+          const p = spawn("openclaw", ["channels", "login", "--channel", "openclaw-weixin"], { env: process.env });
+          let buf = "";
+          p.stdout.on("data", (d: Buffer) => {
+            buf = (buf + d.toString()).split("\n").slice(-40).join("\n"); // 只留末尾帧（QR 会刷新）
+            sse(res, "qr", { text: buf });
+          });
+          p.stderr.on("data", (d: Buffer) => sse(res, "qr", { text: d.toString().slice(-800) }));
+          p.on("close", async (code: number | null) => {
+            if (code === 0) {
+              const account = await bindCurrentAccount(join(root, "runtime/config/wechat.json"));
+              sse(res, "done", { account });
+            } else {
+              sse(res, "error", { error: `登录进程退出（码 ${code}）` });
+            }
+            res.end();
+          });
+          p.on("error", (e: Error) => { sse(res, "error", { error: String(e) }); res.end(); });
+          return;
+        }
+        if (path === "/api/wechat/rebind/pairing" && req.method === "GET") {
+          const r = await runCapture("openclaw", ["pairing", "list", "openclaw-weixin"]);
+          return json(res, 200, { text: r.out.trim() });
+        }
+        if (path === "/api/wechat/rebind/approve" && req.method === "POST") {
+          const p = await body(req);
+          if (!p?.code?.trim()) return json(res, 400, { error: "code 必填" });
+          const r = await runCapture("openclaw", ["pairing", "approve", "openclaw-weixin", String(p.code).trim()]);
+          return json(res, 200, { ok: r.code === 0, text: r.out.trim() });
+        }
+        if (path === "/api/wechat/rebind/target" && req.method === "POST") {
+          const p = await body(req);
+          if (!p?.peer || !validWechatPeer(String(p.peer))) return json(res, 400, { error: "微信 id 格式不对（应为 o…@im.wechat，可从配对列表或网关日志获取）" });
+          const file = join(root, "runtime/config/wechat.json");
+          const cfg = JSON.parse(readFileSync(file, "utf8"));
+          cfg.targetPeer = String(p.peer).trim();
+          writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+          return json(res, 200, { ok: true });
+        }
+        if (path === "/api/wechat/rebind/restart" && req.method === "POST") {
+          await gatewayCtl("restart");
+          return json(res, 200, { ok: true });
+        }
+
+        // ── 会话列表（对话页右岛）：首条用户消息命名，剥离通道噪声头 ──
+        if (path === "/api/sessions" && req.method === "GET") {
+          const dir = join(root, "runtime", "chats");
+          const out: { id: string; title: string; count: number; lastTs: string; src: string }[] = [];
+          if (existsSync(dir)) {
+            for (const f of readdirSync(dir)) {
+              if (!f.endsWith(".jsonl")) continue;
+              const id = f.replace(".jsonl", "");
+              let title = "", count = 0, lastTs = "";
+              for (const line of readFileSync(join(dir, f), "utf8").split("\n")) {
+                if (!line.trim()) continue;
+                try {
+                  const d = JSON.parse(line);
+                  if (d.timestamp) lastTs = d.timestamp;
+                  if (d.type !== "message" || d.message?.role !== "user") continue;
+                  const text = (Array.isArray(d.message.content) ? d.message.content : [])
+                    .filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+                  const clean = text.replace(/Conversation info:[\s\S]*?```\n/, "").replace(/^⟦[^⟧]*⟧\s*/, "").replace(/^\[[\w :,+GMT-]*\]\s*/, "").replace(/[\n\r]/g, " ").trim();
+                  count++;
+                  if (!title && clean) title = clean.slice(0, 26);
+                } catch { /* 坏行跳过 */ }
+              }
+              out.push({ id, title: title || "（无标题）", count, lastTs, src: id === "web" || id.startsWith("web-") ? "web" : "wechat" });
             }
           }
-          return json(res, 200, { msgs: msgs.slice(-40) });
+          out.sort((a, b) => (a.lastTs < b.lastTs ? 1 : -1));
+          return json(res, 200, { sessions: out });
+        }
+
+        if (path === "/api/chat/history" && req.method === "GET") {
+          const sid = url.searchParams.get("session")?.replace(/[^\w-]/g, "").slice(0, 64) || "web";
+          return json(res, 200, { msgs: historyOf(sid) });
         }
         if (path === "/api/chat" && req.method === "POST") {
-          const { text } = await body(req);
+          const { text, session } = await body(req);
           if (!text) return json(res, 400, { error: "text 不能为空" });
+          if (chatBusy) return json(res, 429, { error: "上一条还在处理中" });
+          chatBusy = true;
           res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-          res.write(`event: start\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+          sse(res, "start", { ok: true });
           try {
+            const sid = typeof session === "string" ? session.replace(/[^\w-]/g, "").slice(0, 64) || "web" : "web";
             const reply = deps.chat
               ? await deps.chat(text)
-              : await (await import("../chat/session.ts")).webChat(text, root, deps.agentDir ?? join(root, "runtime", "agent"), logger);
-            res.write(`event: done\ndata: ${JSON.stringify({ text: reply })}\n\n`);
+              : await (await import("../chat/session.ts")).webChat(text, root, deps.agentDir ?? join(root, "runtime", "agent"), logger, sid);
+            sse(res, "done", { text: reply });
           } catch (e) {
             // 错误原样推给前端（产品理念：不吞错）
-            res.write(`event: error\ndata: ${JSON.stringify({ error: String(e).slice(0, 500) })}\n\n`);
+            sse(res, "error", { error: String(e).slice(0, 500) });
+          } finally {
+            chatBusy = false;
+            res.end();
           }
-          return res.end();
+          return;
         }
 
         return json(res, 404, { error: `未知 API：${req.method} ${path}` });
