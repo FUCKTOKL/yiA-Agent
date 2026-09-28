@@ -355,6 +355,14 @@ const isEntry = (() => {
 })();
 
 if (isEntry) {
+  server.on("error", (e: NodeJS.ErrnoException) => {
+    if (e.code === "EADDRINUSE") {
+      console.error(`端口 ${PORT} 已被占用——可能已有一个 yiA Web 在跑。\n先停掉旧实例（lsof -t -i:${PORT} | xargs kill）或换端口：YIA_WEB_PORT=${PORT + 1} npm run web`);
+    } else {
+      console.error(`启动失败：${String(e)}`);
+    }
+    process.exit(1);
+  });
   server.listen(PORT, "127.0.0.1", () => {
     console.log(`yiA Web 已启动：http://127.0.0.1:${PORT}（仅本机可访问；Ctrl+C 停止）`);
   });
