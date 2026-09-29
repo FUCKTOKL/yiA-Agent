@@ -87,10 +87,12 @@ body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
   background:var(--btn-sub);display:flex;align-items:center;justify-content:center}
 .status-btn:hover{background:var(--btn-sub-hover)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px rgba(52,199,89,.7)}
-.status-pop{position:absolute;left:52px;bottom:0;width:230px;padding:14px 16px;border-radius:18px;
+.status-pop{position:fixed;left:136px;bottom:calc(50% - 120px);width:230px;padding:14px 16px;border-radius:18px;
   font-family:var(--mono);font-size:11.5px;line-height:2;color:var(--t2);white-space:nowrap;
-  opacity:0;pointer-events:none;transform:translateX(-6px);transition:all .3s var(--ease)}
-.status-pop.show{opacity:1;pointer-events:auto;transform:none}
+  /* fixed：脱离 rail 的溢出计算（absolute 子元素会撑出父级 scrollWidth）；坐标对齐 rail 右侧弹出 */
+  z-index:60;display:none;pointer-events:none}
+.status-pop.show{display:block;pointer-events:auto;animation:popin .25s var(--ease)}
+@keyframes popin{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
 .status-pop b{color:var(--t1);font-weight:500}
 .status-pop .ok{color:var(--ok)} .status-pop .bad{color:var(--accent)}
 .sdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:8px;vertical-align:1px}

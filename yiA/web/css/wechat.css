@@ -33,7 +33,7 @@
 .rb-pane.show{display:block}
 .rb-qr{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:12px;padding:12px;
   font-family:ui-monospace,monospace;font-size:10.5px;line-height:1.15;color:var(--t1);
-  white-space:pre;overflow:auto;max-height:260px;margin:10px 0}
+  white-space:pre-wrap;word-break:break-all;overflow:hidden;max-height:260px;margin:10px 0}
 
 /* 扫码框：白底黑码——终端 QR 的黑模块是 █ 字符、白模块是空格，
    暗底会极性反转扫不出；白底 + 等宽半块字符才能保持网格对齐 */
