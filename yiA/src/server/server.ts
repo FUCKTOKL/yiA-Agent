@@ -215,6 +215,38 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           // SSE：扫码登录，流式转发二维码。终端 QR 带 ANSI 转义码且与日志行交织，
           // 直接透传会“格式崩溃”——剥转义 + 只保留最后一个连续 QR 块（█▀▄ 组成）
           const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
+          /** 半块字符 QR → 模块矩阵 → SVG（矩形横向合并）。
+           *  字符渲染在浏览器里列宽不一致（空格与 █▀▄ 回退字体不同）致码畸变扫不出，
+           *  SVG 每模块正方形像素级精确，与字体无关。▀=上半黑 ▄=下半黑 █=全黑 */
+          const qrToSvg = (block: string): string | null => {
+            const lines = block.split("\n").map((l) => l.replace(/\s+$/, ""));
+            if (lines.length < 4) return null;
+            const w = Math.max(...lines.map((l) => l.length));
+            const rows: boolean[][] = [];
+            for (const l of lines) {
+              const top: boolean[] = [], bot: boolean[] = [];
+              for (let x = 0; x < w; x++) {
+                const c = l[x] ?? " ";
+                top.push(c === "▀" || c === "█");
+                bot.push(c === "▄" || c === "█");
+              }
+              rows.push(top, bot);
+            }
+            const h = rows.length, s = 4, quiet = 4; // 每模块 4px，静区 4 模块（QR 规范）
+            let rects = "";
+            for (let y = 0; y < h; y++) {
+              let x = 0;
+              while (x < w) {
+                if (rows[y][x]) {
+                  let x2 = x; while (x2 + 1 < w && rows[y][x2 + 1]) x2++;
+                  rects += `<rect x="${(x + quiet) * s}" y="${(y + quiet) * s}" width="${(x2 - x + 1) * s}" height="${s}"/>`;
+                  x = x2 + 1;
+                } else x++;
+              }
+            }
+            const W = (w + quiet * 2) * s, H = (h + quiet * 2) * s;
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="240" style="background:#fff;display:block"><g fill="#000">${rects}</g></svg>`;
+          };
           const extractQr = (text: string): string => {
             const lines = stripAnsi(text).split("\n").map((l) => l.replace(/\s+$/, ""));
             const isQr = (l: string) => l.length > 10 && /^[█▀▄ ]+$/.test(l);
@@ -230,7 +262,11 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           sse(res, "start", {});
           const p = spawn("openclaw", ["channels", "login", "--channel", "openclaw-weixin"], { env: process.env });
           let raw = "";
-          const push = () => sse(res, "qr", { text: extractQr(raw) });
+          const push = () => {
+            const text = extractQr(raw);
+            const svg = qrToSvg(text);
+            sse(res, "qr", svg ? { svg, text } : { text });
+          };
           p.stdout.on("data", (d: Buffer) => { raw = (raw + d.toString()).slice(-20000); push(); });
           p.stderr.on("data", (d: Buffer) => { raw = (raw + d.toString()).slice(-20000); push(); });
           p.on("close", async (code: number | null) => {

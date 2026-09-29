@@ -47,7 +47,12 @@ $("#rbStart").onclick = async () => {
 function qrLogin() {
   const qrBox = $("#rbQr"); qrBox.textContent = "等待二维码…";
   api.sse("/api/wechat/rebind/qr", {}, (evt, data) => {
-    if (evt === "qr") { qrBox.textContent = data.text || "…"; $("#rbSt2").textContent = "扫码后自动进入下一步"; }
+    if (evt === "qr") {
+      // 优先 SVG（像素级精确）；无码时透传状态文本
+      if (data.svg) qrBox.innerHTML = data.svg;
+      else qrBox.textContent = data.text || "…";
+      $("#rbSt2").textContent = "扫码后自动进入下一步";
+    }
     if (evt === "done") {
       $("#rbSt2").textContent = `登录成功，发送账号已绑定：${data.account ?? "?"}`;
       setTimeout(() => step(3), 800);

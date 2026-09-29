@@ -39,4 +39,5 @@
    暗底会极性反转扫不出；白底 + 等宽半块字符才能保持网格对齐 */
 #rbQr{background:#fff;color:#000;font-size:11px;line-height:1.05;
   letter-spacing:0;white-space:pre;width:max-content;min-width:200px;
-  max-width:100%;margin:10px auto;padding:14px 16px;overflow:hidden}
+  max-width:100%;margin:10px auto;padding:14px;overflow:hidden;text-align:center}
+#rbQr svg{margin:0 auto}
