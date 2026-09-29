@@ -27,6 +27,8 @@ function appendMsg(who, html, t = now()) {
 
 async function loadHistory() {
   const { msgs } = await api.chatHistory(activeSession);
+  // 清旧消息（保留 ctxBar），一次只显示当前会话的历史
+  $$("#chatScroll .msg").forEach((el) => el.remove());
   if (msgs.length) {
     $("#chatEmpty").hidden = true; chatScroll.style.display = "";
     for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t ? fmtTs(m.t) : undefined);
