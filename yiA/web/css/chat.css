@@ -49,3 +49,11 @@
 .cmd-row:hover{background:var(--row-hover-strong)}
 .cmd-row .mono{font-size:12.5px;color:var(--t1);flex:none}
 .cmd-row span{font-size:12.5px;color:var(--t3)}
+
+/* 会话条目删除键：常驻可见（低调），hover 强化 */
+.hist-item{position:relative}
+.hist-item .del{position:absolute;top:6px;right:8px;width:22px;height:22px;border:none;border-radius:50%;
+  background:transparent;color:var(--t3);font-size:15px;line-height:22px;cursor:pointer;
+  opacity:.45;transition:opacity .15s,color .15s,background .15s}
+.hist-item:hover .del{opacity:.85;background:var(--btn-sub)}
+.hist-item .del:hover{opacity:1;color:var(--accent);background:var(--btn-sub)}

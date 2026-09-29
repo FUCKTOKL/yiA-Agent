@@ -64,6 +64,7 @@ export const api = {
   wechatSetTarget: (peer) => req("POST", "/api/wechat/rebind/target", { peer }),
   wechatRestart: () => req("POST", "/api/wechat/rebind/restart"),
   sessions: () => req("GET", "/api/sessions"),
+  deleteSession: (id) => req("DELETE", `/api/sessions/${encodeURIComponent(id)}`),
   chatHistory: (session = "web") => req("GET", `/api/chat/history?session=${encodeURIComponent(session)}`),
 
   /** SSE 对话：onsse(evt, data) 依次收到 start/done/error */

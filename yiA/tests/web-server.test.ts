@@ -1,7 +1,7 @@
 /** Web 服务器 API 冒烟测试：工厂注入临时 root（不碰真实 runtime、不调模型） */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createYiaServer } from "../src/server/server.ts";
@@ -73,6 +73,18 @@ test("POST /api/chat SSE（注入假 chat，不打模型）", async () => {
   });
   assert.equal(res.status, 200);
   assert.ok(res.headers.get("content-type")!.includes("text/event-stream"));
+});
+
+test("DELETE /api/sessions/:id 删除会话归档", async () => {
+  const chats = join(root, "runtime", "chats");
+  mkdirSync(chats, { recursive: true });
+  const f = join(chats, "sess-del.jsonl");
+  writeFileSync(f, '{"type":"message","timestamp":"t","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}\n');
+  const { status, body } = await j("/api/sessions/sess-del", { method: "DELETE" });
+  assert.equal(status, 200); assert.ok(body.ok);
+  assert.ok(!existsSync(f), "归档文件应已删除");
+  const { status: s2 } = await j("/api/sessions/sess-del", { method: "DELETE" });
+  assert.equal(s2, 404);
 });
 
 test("未知 API 404 带错误文本", async () => {

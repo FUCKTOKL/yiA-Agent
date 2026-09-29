@@ -23,7 +23,7 @@
  *   /*                          → 静态文件 yiA/web/
  */
 import { createServer, type Server } from "node:http";
-import { createReadStream, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import net from "node:net";
@@ -302,6 +302,17 @@ export function createYiaServer(deps: YiaServerDeps): Server {
         }
         if (path === "/api/wechat/rebind/restart" && req.method === "POST") {
           await gatewayCtl("restart");
+          return json(res, 200, { ok: true });
+        }
+
+        // 删除会话（本地历史归档；微信侧不受影响）：删文件 + 卸载内存缓存
+        m = path.match(/^\/api\/sessions\/([\w-]+)$/);
+        if (m && req.method === "DELETE") {
+          const file = join(root, "runtime", "chats", m[1] + ".jsonl");
+          if (!resolve(file).startsWith(join(root, "runtime", "chats"))) return json(res, 400, { error: "非法会话 id" });
+          (await import("../chat/session.ts")).disposeSession(m[1]); // 防内存里旧上下文复活
+          if (!existsSync(file)) return json(res, 404, { error: `会话不存在：${m[1]}` });
+          rmSync(file);
           return json(res, 200, { ok: true });
         }
 

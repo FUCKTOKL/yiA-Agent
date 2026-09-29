@@ -86,12 +86,27 @@ async function loadSessions() {
       <div class="hist-item glass-sub ${s.id === activeSession ? "active" : ""}" data-id="${s.id}">
         <h4>${esc(s.title)}</h4>
         <div class="mono">${s.src === "web" ? "Web" : "微信"} · ${s.count} 条 · ${esc(fmtTs(s.lastTs))}</div>
+        <button class="del" title="删除此会话记录">×</button>
       </div>`).join("") || '<div class="empty-block"><p>还没有会话</p></div>';
     $$("#histList .hist-item").forEach((el) => {
       el.onclick = async () => {
         activeSession = el.dataset.id;
         $$("#histList .hist-item").forEach((x) => x.classList.toggle("active", x === el));
         await loadHistory().catch(() => {});
+      };
+      el.querySelector(".del").onclick = async (e) => {
+        e.stopPropagation();
+        const id = el.dataset.id;
+        if (!confirm(`删除会话「${el.querySelector("h4").textContent}」的全部本地记录？此操作不可恢复。`)) return;
+        try {
+          await api.deleteSession(id);
+          if (id === activeSession) {
+            activeSession = "web";
+            $$("#chatScroll .msg").forEach((x) => x.remove());
+            await loadHistory().catch(() => {});
+          }
+          loadSessions();
+        } catch (err) { alert("删除失败：" + err.message); }
       };
     });
   } catch (e) {

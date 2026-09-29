@@ -20,6 +20,11 @@ function safeId(session: string): string {
 
 const cache = new Map<string, WebSession>();
 
+/** 卸载某个会话的缓存实例（删除会话文件前调用，防内存里旧上下文复活） */
+export function disposeSession(session = "web"): void {
+  cache.get(safeId(session))?.dispose();
+}
+
 export async function webChat(text: string, root: string, agentDir: string, logger: Logger, session = "web"): Promise<string> {
   const sid = safeId(session);
   let s = cache.get(sid);
