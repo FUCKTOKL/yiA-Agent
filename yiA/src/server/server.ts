@@ -212,16 +212,27 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           return json(res, 200, { ok: true, moved });
         }
         if (path === "/api/wechat/rebind/qr" && req.method === "POST") {
-          // SSE：扫码登录，流式转发终端二维码（qrcode-terminal 的 ASCII 块）
+          // SSE：扫码登录，流式转发二维码。终端 QR 带 ANSI 转义码且与日志行交织，
+          // 直接透传会“格式崩溃”——剥转义 + 只保留最后一个连续 QR 块（█▀▄ 组成）
+          const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
+          const extractQr = (text: string): string => {
+            const lines = stripAnsi(text).split("\n").map((l) => l.replace(/\s+$/, ""));
+            const isQr = (l: string) => l.length > 10 && /^[█▀▄ ]+$/.test(l);
+            let best: string[] = [], cur: string[] = [];
+            for (const l of lines) {
+              if (isQr(l)) cur.push(l);
+              else { if (cur.length > best.length) best = cur; cur = []; }
+            }
+            if (cur.length > best.length) best = cur;
+            return best.length >= 4 ? best.join("\n") : lines.slice(-8).join("\n"); // 没码时给末尾状态行
+          };
           res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
           sse(res, "start", {});
           const p = spawn("openclaw", ["channels", "login", "--channel", "openclaw-weixin"], { env: process.env });
-          let buf = "";
-          p.stdout.on("data", (d: Buffer) => {
-            buf = (buf + d.toString()).split("\n").slice(-40).join("\n"); // 只留末尾帧（QR 会刷新）
-            sse(res, "qr", { text: buf });
-          });
-          p.stderr.on("data", (d: Buffer) => sse(res, "qr", { text: d.toString().slice(-800) }));
+          let raw = "";
+          const push = () => sse(res, "qr", { text: extractQr(raw) });
+          p.stdout.on("data", (d: Buffer) => { raw = (raw + d.toString()).slice(-20000); push(); });
+          p.stderr.on("data", (d: Buffer) => { raw = (raw + d.toString()).slice(-20000); push(); });
           p.on("close", async (code: number | null) => {
             if (code === 0) {
               const account = await bindCurrentAccount(join(root, "runtime/config/wechat.json"));
