@@ -53,6 +53,19 @@ let busy = false;
 async function send() {
   const v = chatInput.value.trim();
   if (!v || busy) return;
+  // 斜杠命令兜底：面板被关（如点外）时手敲完整命令也能执行，绝不发给模型
+  if (v.startsWith("/")) {
+    busy = true;
+    chatInput.value = "";
+    hideCmd();
+    sysMsg(`$ ${v}`);
+    const [cmd, ...rest] = v.split(/\s+/);
+    const c = COMMANDS.find((x) => x.cmd === cmd);
+    try { await Promise.resolve(c ? c.run(rest.join(" ")) : sysMsg(`未知命令 ${cmd}，/help 看清单`)); }
+    catch (e) { sysMsg("出错：" + e.message); }
+    busy = false; sendBtn.disabled = false; chatInput.focus();
+    return;
+  }
   busy = true; sendBtn.disabled = true;
   $("#chatEmpty").hidden = true; chatScroll.style.display = "";
   appendMsg("user", v);
@@ -68,7 +81,92 @@ async function send() {
 }
 
 sendBtn.onclick = send;
-chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+chatInput.addEventListener("keydown", (e) => {
+  // 命令面板键盘导航（面板可见时拦截方向键/Enter/Tab/Esc）
+  if (cmdMenu.style.display !== "none") {
+    const opts = [...$$("#cmdMenu .cmd-row")];
+    let i = opts.findIndex((o) => o.classList.contains("sel"));
+    if (e.key === "ArrowDown") { e.preventDefault(); opts[i]?.classList.remove("sel"); opts[(i + 1) % opts.length].classList.add("sel"); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); opts[i]?.classList.remove("sel"); opts[(i - 1 + opts.length) % opts.length].classList.add("sel"); return; }
+    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); opts[i]?.click(); return; }
+    if (e.key === "Escape") { hideCmd(); return; }
+  }
+  if (e.key === "Enter") send();
+});
+
+/* ===== 斜杠命令：yiA 功能直达（客户端拦截，不发给模型） ===== */
+const cmdMenu = $("#cmdMenu");
+const COMMANDS = [
+  { cmd: "/login", desc: "模型接入（查看/更新 key）", run: () => runLogin() },
+  { cmd: "/model", desc: "查看/切换默认模型", arg: "模型id（留空看清单）", run: (a) => runModel(a) },
+  { cmd: "/status", desc: "系统状态", run: async () => sysMsg(JSON.stringify(await api.status(), null, 0)) },
+  { cmd: "/reminders", desc: "待办提醒清单", run: async () => {
+      const { pending } = await api.reminders();
+      sysMsg(pending.length ? pending.map((r) => `${r.at.slice(5, 16)} ${r.title}（${r.channel === "tui" ? "TUI" : "微信"}）`).join("\n") : "当前没有排期中的提醒");
+    } },
+  { cmd: "/memory", desc: "检索知识库", arg: "关键词", run: async (a) => {
+      const { entries } = await api.memory(a || "");
+      sysMsg(entries.length ? entries.slice(0, 8).map((m) => `${m.id} ${m.title}`).join("\n") : "没有匹配的条目");
+    } },
+  { cmd: "/new", desc: "新开一个对话", run: () => $("#newChatBtn").click() },
+  { cmd: "/help", desc: "列出全部命令", run: () => sysMsg(COMMANDS.map((c) => c.cmd + (c.arg ? ` ${c.arg}` : "") + " — " + c.desc).join("\n")) },
+];
+const sysMsg = (text) => appendMsg("ai", esc(text).replace(/\n/g, "<br>"));
+const hideCmd = () => { cmdMenu.style.display = "none"; };
+
+function showCmd(filter) {
+  const list = COMMANDS.filter((c) => !filter || c.cmd.startsWith(filter));
+  if (!list.length) { hideCmd(); return; }
+  cmdMenu.innerHTML = list.map((c, i) =>
+    `<div class="cmd-row${i === 0 ? " sel" : ""}" data-cmd="${c.cmd}"><b>${c.cmd}</b>${c.arg ? ` <span class="arg">${c.arg}</span>` : ""}<span>${c.desc}</span></div>`).join("");
+  cmdMenu.style.display = "block";
+  $$("#cmdMenu .cmd-row").forEach((row) => {
+    row.onclick = () => execCmd(row.dataset.cmd);
+  });
+}
+function execCmd(raw) {
+  hideCmd(); chatInput.value = "";
+  const [cmd, ...rest] = raw.trim().split(/\s+/);
+  const c = COMMANDS.find((x) => x.cmd === cmd);
+  if (!c) return;
+  sysMsg(`$ ${raw}`);
+  Promise.resolve(c.run(rest.join(" "))).catch((e) => sysMsg("出错：" + e.message));
+}
+async function runLogin() {
+  const info = await api.loginInfo();
+  sysMsg(`当前接入：${Object.keys(info.auth).join("、") || "（无）"} · 默认模型：${info.defaultModel || "未设"}\n在下方输入 provider 与 key 即可更新，格式：provider your-api-key`);
+  loginPending = true;
+}
+async function runModel(arg) {
+  const info = await api.loginInfo();
+  if (!arg) { sysMsg(`可用模型：\n${info.models.map((m) => m.id).join("\n")}\n当前默认：${info.defaultModel || "未设"}\n切换：/model 模型id`); return; }
+  const m = info.models.find((x) => x.id === arg);
+  if (!m) return sysMsg(`没有模型 ${arg}，/model 看清单`);
+  await api.setModel(m.id);
+  sysMsg(`默认模型已切到 ${m.id}，新会话生效`);
+}
+let loginPending = false;
+
+chatInput.addEventListener("input", () => {
+  const v = chatInput.value;
+  // /login 后等待 provider key；但新命令输入（/ 开头）取消等待，回到命令流
+  if (loginPending && v.trim() && !v.startsWith("/")) {
+    const [provider, ...rest] = v.trim().split(/\s+/);
+    if (rest.length) {
+      loginPending = false; chatInput.value = "";
+      api.loginKey(provider, rest.join(" ")).then(() => sysMsg(`已更新 ${provider} 的接入，新会话生效`)).catch((e) => sysMsg("失败：" + e.message));
+      return;
+    }
+  }
+  if (v.startsWith("/") && !v.includes(" ")) showCmd(v);
+  else if (v.startsWith("/")) {
+    const [c, ...rest] = v.trim().split(/\s+/);
+    const match = COMMANDS.find((x) => x.cmd === c);
+    if (match && (rest.length || c !== "/memory" && c !== "/model")) { hideCmd(); return; }
+    showCmd(c);
+  } else hideCmd();
+});
+document.addEventListener("click", (e) => { if (!cmdMenu.contains(e.target) && e.target !== chatInput) hideCmd(); });
 $$(".quick").forEach((b) => (b.onclick = () => { chatInput.value = b.textContent; chatInput.focus(); }));
 $("#ctxBar").onclick = () => $("#ctxBar").classList.toggle("open");
 

@@ -305,6 +305,46 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           return json(res, 200, { ok: true });
         }
 
+        // ── 模型接入（Web 版 /login）：查看当前接入 + 更新 API key + 切默认模型 ──
+        if (path === "/api/login" && req.method === "GET") {
+          let auth: Record<string, unknown> = {};
+          const authFile = join(root, "runtime", "agent", "auth.json");
+          if (existsSync(authFile)) {
+            const raw = JSON.parse(readFileSync(authFile, "utf8")) as Record<string, { type?: string }>;
+            auth = Object.fromEntries(Object.keys(raw).map((p) => [p, raw[p]?.type ?? "api_key"]));
+          }
+          let settings: any = {};
+          const settingsFile = join(root, "runtime", "agent", "settings.json");
+          if (existsSync(settingsFile)) settings = JSON.parse(readFileSync(settingsFile, "utf8"));
+          // 可选模型清单从 models-store 读（id+name）
+          const storeFile = join(root, "runtime", "agent", "models-store.json");
+          const models: { id: string; name: string }[] = [];
+          if (existsSync(storeFile)) {
+            const store = JSON.parse(readFileSync(storeFile, "utf8")) as Record<string, { models?: { id: string; name: string }[] }>;
+            for (const prov of Object.values(store)) for (const mm of prov.models ?? []) models.push({ id: mm.id, name: mm.name });
+          }
+          return json(res, 200, { auth, defaultModel: settings.defaultModel ?? "", defaultProvider: settings.defaultProvider ?? "", models });
+        }
+        if (path === "/api/login" && req.method === "POST") {
+          const p = await body(req);
+          const authFile = join(root, "runtime", "agent", "auth.json");
+          if (!p?.provider || !p?.key || String(p.key).length < 8) return json(res, 400, { error: "需要 provider 与 key（≥8 字符）" });
+          const auth = existsSync(authFile) ? JSON.parse(readFileSync(authFile, "utf8")) : {};
+          auth[String(p.provider)] = { type: "api_key", key: String(p.key) };
+          writeFileSync(authFile, JSON.stringify(auth, null, 2) + "\n", "utf8");
+          return json(res, 200, { ok: true, note: "新会话生效" });
+        }
+        if (path === "/api/model" && req.method === "POST") {
+          const p = await body(req);
+          if (!p?.model) return json(res, 400, { error: "需要 model" });
+          const settingsFile = join(root, "runtime", "agent", "settings.json");
+          const settings = existsSync(settingsFile) ? JSON.parse(readFileSync(settingsFile, "utf8")) : {};
+          settings.defaultModel = String(p.model);
+          if (p.provider) settings.defaultProvider = String(p.provider);
+          writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n", "utf8");
+          return json(res, 200, { ok: true, note: "新会话生效" });
+        }
+
         // 删除会话（本地历史归档；微信侧不受影响）：删文件 + 卸载内存缓存
         m = path.match(/^\/api\/sessions\/([\w-]+)$/);
         if (m && req.method === "DELETE") {

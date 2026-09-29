@@ -85,7 +85,8 @@
       </div>
 
       <div class="chat-input glass-sub">
-        <input id="chatInput" placeholder="说点什么…（Enter 发送）" autocomplete="off" disabled>
+        <div class="cmd-menu glass" id="cmdMenu" style="display:none"></div>
+        <input id="chatInput" placeholder="说点什么…（/ 唤出命令）" autocomplete="off" disabled>
         <button class="send-btn" id="sendBtn" title="发送" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
