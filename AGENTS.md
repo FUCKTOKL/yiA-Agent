@@ -32,18 +32,32 @@
 - ✅ 发送指定 accountId（多账号防歧义）；僵尸账号条目已从解析排除
 - ○ 群聊（插件能力边界外）
 
+### yiA 人格（全通道生效）
+- ✅ **记忆管家**：优雅/可靠/克制的英式管家风——口语化短句、称您、禁 Markdown 结构符、办事简短确认不复述（`src/agent/system-prompt.ts`，Web/微信/TUI 同一人格）
+
 ### TUI（终端界面）
 - ✅ `yiA` 命令启动（独立运行时，PATH 安装）
 - ✅ 自定义命令仅三个：`/reminder` `/wechat` `/brain`（记忆浏览：列表→Markdown 查看器）
-- ✅ 跨平台：Linux/macOS（systemd/launchd）+ **Windows 原生**（bat/ps1/启动文件夹/schtasks）
+- ✅ 跨平台：Linux/macOS（systemd/launchd）+ **Windows 原生**（bat/ps1/启动文件夹，`yiA/scripts/win/`）
+
+### Web 端（M6，`npm run web` → http://127.0.0.1:3777）
+- ✅ 后端：`src/server/server.ts` 工厂（DI 可测）+ `scripts/web-server.ts` 薄入口；零依赖 HTTP+SSE，仅绑 127.0.0.1
+- ✅ 四页：对话（真实 agent 会话 SSE、ContextPack 折叠条）/ 记忆（列表+力导向图谱+聚焦阅读/编辑/删除）/ 提醒（增删）/ 微信（状态+测试推送）
+- ✅ **会话管理**：全部历史会话列表（首条用户消息命名，剥微信噪声头）、切换/删除/新开，删会话自动卸载内存缓存
+- ✅ **斜杠命令**：`/login`（模型接入）/`/model`/`/status`/`/reminders`/`/memory`/`/new`/`/help`，命令面板反色浮层，客户端拦截不发给模型
+- ✅ **Web 换绑向导**：五步（登出→扫码→配对→推送目标→重启），二维码 ASCII→模块矩阵→SVG（字体无关可扫），与 TUI 共用 `src/channels/weixin-ops.ts`
+- ✅ **背景持久化**：`/api/bg` 存 runtime/web/bg.img，刷新/换浏览器自动继承，双击恢复默认
+- ✅ 材质：Apple 风格毛玻璃，**色底 .96 岛间同色**（透明材质岛间必有色差，已定论）；无横向滚动条（溢出扫描器验证）
+- ○ Web 常驻服务化（现为手动 npm run web）
 
 ### 工程化
 - ✅ 单元测试 44 条（node:test 零依赖）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
-- ✅ 已开源（MIT），双平台 provision 一键部署
-- ◐ M6 Web（原型一轮设计审查已过并修复，已 ES 模块化：壳 + 按页碎片 `pages/*.html` + 按页模块 `js/pages/*.js`，需本地服务器打开，见 `yia-ui/README.md`；待接 HTTP+SSE）
-- ○ M7 知识图谱
+- ✅ 已开源（MIT，仓库 github.com/FUCKTOKL/yiA-Agent，**当前 PRIVATE 待转公开**）；双平台 provision 一键部署
+- ✅ 视觉验证流水线：playwright-core（sidecar node_modules）+ headless Chromium（~/.cache/ms-playwright），截图+像素量化（溢出扫描/岛面均匀度/QR 网格对齐），色差类 bug 必须量化定位不盲修
+- ◐ M6 Web：功能已齐（见上节 Web 端），待常驻化
+- ○ M7 知识图谱：Web 端已有确定性力导向图（60 轮松弛）+降级关联列表；独立图谱页远期
 
 ## 3. 关键决策（已定，不要推翻）
 
@@ -58,16 +72,19 @@
 | 网关控制 | 统一 `openclaw gateway start/stop/restart`（自带 systemd/launchd/schtasks 适配），不直接调 systemctl |
 | 换绑语义 | 替换式（1 bot 账号 + 1 推送目标）；账号 id **每次登录都会变**，登录后自动解析写入 wechat.json 的 account 字段 |
 | 微信凭据 | ~/.openclaw/openclaw-weixin/accounts/ 下按文件存；插件不支持 CLI logout，登出=移除凭据文件（备份到 .removed-backup/） |
-| 分期 | TUI 期做齐能力（含微信）→ M6 Web 增值 UI → App 远期 |
+| Web 架构 | `src/server/server.ts` 工厂（createYiaServer，DI 可测）+ `scripts/web-server.ts` 薄入口；曾出现双后端并行事故（无测脚本影子实现），合并后禁止另起炉灶 |
+| Web 材质 | Apple 毛玻璃，色底 **.96**：透明材质岛间必有色差（透多少差多少），多轮实测定论，不要回调透明度 |
+| Web 二维码 | 终端 ASCII 码必转 SVG（字符列宽在浏览器不可靠对齐）；剥 ANSI+提取纯█▀▄块再解析模块矩阵 |
+| 验证方式 | 视觉/布局 bug 用 playwright 截图+像素量化定位（headless 软渲染复现不了 GPU 合成 bug，需真浏览器确认） |
+| 分期 | TUI 期做齐能力（含微信）→ M6 Web 增值 UI ✅ → 常驻化/App 远期 |
 
-## 4. 里程碑状态（2026-09-29）
+## 4. 里程碑状态（2026-10-01）
 
-- M1 TUI 骨架 ✅　M2 记忆完整 ✅　M3 提醒调度 ✅
-- M4 微信接入 ✅（含换绑双账号事故修复、accountId 防歧义、peer 格式校验）
-- M5 TUI 打磨 ✅（命令收敛、/brain、`yiA` 启动器、E2E 体检 12 项全绿）
-- v0.5.0 已开源 GitHub；Windows 原生支持 ✅
-- **M6 Web MVP** ◐ 原型已出并通过一轮设计审查（对比度/可达性/令牌化修复，2026-09-29），同日完成 ES 模块化拆分：`yiA/yia-ui/`，桌面优先；待实现 HTTP+SSE
-- M7 知识图谱（Cytoscape，降级=关联列表）○
+- M1 TUI 骨架 ✅　M2 记忆完整 ✅　M3 提醒调度 ✅　M4 微信接入 ✅　M5 TUI 打磨 ✅
+- v0.5.0 开源 GitHub（PRIVATE 待转公开）；Windows 原生支持 ✅
+- **M6 Web** ✅ 功能全齐：四页 UI、真实会话 SSE、会话管理（列表/切换/删除）、斜杠命令层、Web 换绑向导（QR SVG）、背景持久化、yiA 人格上线；待常驻化
+- M7 知识图谱 ◐ Web 端已有力导向图+降级列表；独立图谱页远期
+- 技术债：无阻塞项；杂项见 `problem.md`（扩展点/部署/上下文/插件兼容四问）
 
 ## 5. 工程约束（提交前检查）
 
@@ -89,6 +106,13 @@
 | 日志查不到当天 | 文件名曾用 UTC 日期 | 已改本地时区（2026-09-14） |
 | CLI 后端 harness 报错 | openclaw 8.1 agentRuntime pin 触发绑定检查 | 模型只用纯 ref，勿加 agentRuntime.id |
 | fd/rg 下载超时 | Clash TUN fake-IP DNS | 从个人 pi bin/ 拷静态二进制 |
+| npm run web 甩 node 堆栈 | 端口被残留实例占用（EADDRINUSE） | server.on('error') 友好提示；杀端口或换 YIA_WEB_PORT |
+| 悬停左栏右岛变色 | 噪点层 mix-blend-mode 与 backdrop-filter 跨表面 GPU 合成错乱（动 A 坏 B） | 材质层禁用 blend，透明度烘进 SVG；子层嵌套去二次 backdrop-filter |
+| 岛间/岛内色差反复 | 透明材质固有：压背景亮区就亮 | 色底 .96 定论；嵌套子层补偿；勿回调透明度 |
+| Web 二维码扫不出 | 浏览器字符列宽错位（空格与 █▀▄ 回退字体不同） | 半块字符→模块矩阵→SVG，与字体无关 |
+| 切会话历史叠加 | loadHistory 不清旧 .msg 节点 | 清节点但保留同容器 ctxBar（不能 innerHTML 一刀切） |
+| provision 不可重跑 | 历史游离引号致 bash 语法错 | 已修；bash -n 预检脚本语法 |
+| Web 双后端事故 | 新写 scripts 版影子实现与 src/server 并行（无单测） | 合并回工厂模式；改后端只改 src/server |
 
 ## 7. 文档索引（docs/）
 
@@ -99,5 +123,6 @@
 | `pi-Agent二次开发方案.md` | Pi 的 8 种二开路径总览 |
 | `Pi-Agent个人助理项目调研.md` | 竞品调研（openclaw/khoj/leon 等） |
 | `测试方案.md` | 测试分层、各里程碑必测项、性能基准 |
+| `../problem.md` | 四问四答：扩展点/开源部署/上下文上限/插件兼容 |
 
 参考实现：hhyqhh/inno-agent（MIT，三层记忆范式）、openclaw weixin 插件（docs.openclaw.ai/channels/wechat.md）、pi 官方（github.com/earendil-works/pi）。
