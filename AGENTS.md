@@ -42,7 +42,7 @@
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT），双平台 provision 一键部署
-- ○ M6 Web（原型已完成：`yiA/web/prototype.html`）
+- ◐ M6 Web（原型一轮设计审查已过并修复，已 ES 模块化：壳 + 按页碎片 `pages/*.html` + 按页模块 `js/pages/*.js`，需本地服务器打开，见 `yia-ui/README.md`；待接 HTTP+SSE）
 - ○ M7 知识图谱
 
 ## 3. 关键决策（已定，不要推翻）
@@ -60,13 +60,13 @@
 | 微信凭据 | ~/.openclaw/openclaw-weixin/accounts/ 下按文件存；插件不支持 CLI logout，登出=移除凭据文件（备份到 .removed-backup/） |
 | 分期 | TUI 期做齐能力（含微信）→ M6 Web 增值 UI → App 远期 |
 
-## 4. 里程碑状态（2026-09-14）
+## 4. 里程碑状态（2026-09-29）
 
 - M1 TUI 骨架 ✅　M2 记忆完整 ✅　M3 提醒调度 ✅
 - M4 微信接入 ✅（含换绑双账号事故修复、accountId 防歧义、peer 格式校验）
 - M5 TUI 打磨 ✅（命令收敛、/brain、`yiA` 启动器、E2E 体检 12 项全绿）
 - v0.5.0 已开源 GitHub；Windows 原生支持 ✅
-- **M6 Web MVP** ◐ 原型已出（`yiA/web/prototype.html`），待实现 HTTP+SSE
+- **M6 Web MVP** ◐ 原型已出并通过一轮设计审查（对比度/可达性/令牌化修复，2026-09-29），同日完成 ES 模块化拆分：`yiA/yia-ui/`，桌面优先；待实现 HTTP+SSE
 - M7 知识图谱（Cytoscape，降级=关联列表）○
 
 ## 5. 工程约束（提交前检查）

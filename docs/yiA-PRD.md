@@ -174,7 +174,7 @@ Agent 运行时    Pi AgentSession + yiA 扩展（工具注册 + 提示词注入
     │   ├── logger.ts        统一日志入口 (M2)
     │   └── runtime.ts / config.ts
     ├── scripts/             loadcheck / bench 等检查脚本
-    ├── web/                 (P2) React 前端（知识图谱在此实现）
+    ├── yia-ui/              (M6) Web 原型（纯静态，桌面优先，已过一轮设计审查）；P2 起 React 前端沿用此目录或另立
     └── python/              (按需) 解析/检索辅助服务
 ```
 

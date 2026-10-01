@@ -1,0 +1,51 @@
+<!-- 页面四：微信；换绑确认随本页 -->
+<section class="page" data-page="wechat">
+  <div class="window glass win-pad">
+    <div class="win-head">
+      <h1>微信</h1>
+      <div class="sub">runtime/wechat.json · 推送通道</div>
+    </div>
+    <div class="hairline"></div>
+    <div class="wx-grid">
+      <div class="wx-card glass-sub">
+        <h3>通道状态</h3>
+        <div class="kv-row"><span class="k">bot 账号</span><span class="v ok"><span class="sdot ok"></span>运行中</span></div>
+        <div class="kv-row"><span class="k">发送账号绑定状态</span><span class="v ok">已绑定</span></div>
+        <div class="kv-row"><span class="k">推送目标</span><span class="v" title="wxid_9f2k…m4z1">wxid_9f2k…m4z1</span></div>
+        <div class="kv-row"><span class="k">配对白名单</span><span class="v bad">3 人 · 待批 1</span></div>
+        <div class="kv-row"><span class="k">最近端到端送达</span><span class="v">2026-09-14 13:58:22</span></div>
+      </div>
+      <div class="wx-card glass-sub">
+        <h3>扫码登录</h3>
+        <div class="qr-wrap">
+          <div class="qr-box">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>
+            <span class="mono">等待扫码…</span>
+          </div>
+          <p class="qr-note">登录后账号自动绑定，旧账号自动登出</p>
+        </div>
+      </div>
+    </div>
+    <div class="wx-actions">
+      <button class="btn-glass" id="testMsgBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        发测试消息
+      </button>
+      <button class="btn-glass danger" id="rebindBtn" data-open="rebindOv">换绑微信</button>
+      <span class="wx-feedback" id="wxFeedback"></span>
+    </div>
+  </div>
+</section>
+
+<!-- 换绑确认 -->
+<div class="overlay" id="rebindOv">
+  <div class="modal-win glass">
+    <h3>换绑微信</h3>
+    <p>将登出全部已登录账号并用新号扫码，继续？</p>
+    <div class="modal-ops">
+      <button class="btn-glass" data-close="rebindOv">取消</button>
+      <button class="btn-red" id="rebindOk">确认换绑</button>
+    </div>
+  </div>
+</div>

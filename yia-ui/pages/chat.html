@@ -1,0 +1,78 @@
+<!-- 页面一：对话（双岛：主聊天 + 历史岛）；引用浮卡与命令面板随本页 -->
+<section class="page islands-page active" data-page="chat">
+  <div class="island glass chat-main">
+    <div class="win-pad">
+      <div class="win-titlebar">
+        <div class="win-head">
+          <h1 id="convName">论文开题冲刺</h1>
+          <div class="sub">runtime/session · SSE</div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn-solid" id="newChatBtn">＋ New</button>
+      </div>
+      <div class="hairline"></div>
+
+      <div id="chatEmpty" class="chat-empty" hidden>
+        <p class="note">从一句话开始，交给 yiA 记住</p>
+        <div class="quick-row">
+          <button class="btn-glass quick">记住：周五要交开题报告初稿</button>
+          <button class="btn-glass quick">我之前说过什么关于咖啡的？</button>
+          <button class="btn-glass quick">提醒我明天早上八点体检</button>
+        </div>
+      </div>
+
+      <div id="chatScroll" class="chat-scroll scroller">
+        <div class="ctx-bar glass-sub" id="ctxBar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+          <span class="t">ContextPack 已注入 · 4 sections</span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="ctx-grid" id="ctxGrid">
+          <div><b>当前时间</b>　2026-09-14 14:20 周一</div>
+          <div><b>用户画像</b>　研究生，论文冲刺期；偏好燕麦拿铁；作息偏晚</div>
+          <div><b>相关记忆</b>　<span class="id">20260914135201-k7x9mf</span> · <span class="id">20260905180233-wx9d4m</span> · <span class="id">20260902101544-b7n4q2</span></div>
+          <div><b>待办提醒</b>　明天 08:00 体检（微信）· 每天 09:30 站会（微信）</div>
+        </div>
+        <div id="msgFlow"></div>
+      </div>
+
+      <div class="chat-input glass-sub">
+        <input id="chatInput" placeholder="说点什么…（Enter 发送）" autocomplete="off">
+        <button class="send-btn" id="sendBtn" title="发送" aria-label="发送">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="island glass hist-island">
+    <div class="win-pad">
+      <div class="win-head"><h1 style="font-size:18px">对话历史</h1></div>
+      <div class="hairline"></div>
+      <div class="hist-list scroller" id="histList"></div>
+      <button class="btn-glass" id="piCmdsBtn" style="justify-content:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5-5 5M12 17h7"/></svg>
+        召唤 pi Agent · 全部命令
+      </button>
+    </div>
+  </aside>
+</section>
+
+<!-- 引用浮卡 -->
+<div class="graph-tip glass" id="citeCard" style="position:fixed;z-index:60;max-width:300px">
+  <h4 id="cTitle"></h4>
+  <div class="mono" id="cId"></div>
+  <p style="font-size:13px;color:var(--t2);margin-top:8px;line-height:1.6" id="cSum"></p>
+</div>
+
+<!-- pi Agent 命令 -->
+<div class="overlay" id="cmdsOv">
+  <div class="modal-win glass" style="width:480px">
+    <h3>召唤 pi Agent · 全部命令</h3>
+    <p>点击任意命令填入输入框，Enter 发送即召唤 pi Agent。</p>
+    <div class="cmds-list scroller" id="cmdsList"></div>
+    <div class="modal-ops">
+      <button class="btn-glass" data-close="cmdsOv">关闭</button>
+    </div>
+  </div>
+</div>

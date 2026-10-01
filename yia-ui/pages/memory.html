@@ -1,0 +1,78 @@
+<!-- 页面二：记忆图谱（双岛）；聚焦阅读层与删除确认随本页 -->
+<section class="page islands-page" data-page="memory">
+  <div class="island island-l glass">
+    <div class="win-pad">
+      <div class="win-head">
+        <h1>记忆图谱</h1>
+        <div class="sub">L2 knowledge · runtime/memory/*.md</div>
+      </div>
+      <div class="hairline" style="margin-bottom:18px"></div>
+      <div class="search-row">
+        <div class="search-box glass-sub">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="memSearch" placeholder="检索…（BM25）" autocomplete="off">
+        </div>
+        <button class="icon-btn" id="memSearchBtn" title="检索" aria-label="检索">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </button>
+        <span class="count" id="memCount">7 条目</span>
+      </div>
+      <div class="file-list scroller" id="fileList"></div>
+      <div class="empty-block" id="memEmpty" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <p>未检索到，换个关键词试试</p>
+        <button class="btn-glass" id="memReset">重置搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="island island-r glass">
+    <div class="win-pad" style="position:relative">
+      <button class="fb-toggle glass-sub" id="fbToggle" type="button" aria-pressed="false" title="切换关联列表降级视图">图谱不可用时显示关联列表<span class="sw"></span></button>
+      <div class="graph-wrap" id="graphWrap">
+        <svg id="graph" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet">
+          <g id="gview"></g>
+        </svg>
+        <div class="graph-tip glass-sub" id="graphTip"><h4></h4><div class="mono"></div></div>
+        <div class="legend glass-sub">
+          <span><i class="lg-dot"></i>记忆条目</span>
+          <span><i class="lg-hub"></i>核心枢纽（链接 ≥3）</span>
+        </div>
+      </div>
+      <div class="fb-list scroller" id="fbList" hidden></div>
+    </div>
+  </div>
+</section>
+
+<!-- 聚焦阅读层 -->
+<div class="overlay" id="focusOv">
+  <div class="focus-win glass">
+    <div class="focus-head">
+      <div>
+        <h2 id="fTitle"></h2>
+        <div class="mid" id="fId"></div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="icon-btn" id="fClose" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="fm-block" id="fFm"></div>
+    <div class="focus-body scroller" id="fBody" style="padding-right:8px"></div>
+    <div class="focus-actions">
+      <button class="btn-glass" id="fEdit">编辑</button>
+      <button class="btn-glass danger" id="fDel">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="overlay" id="delOv">
+  <div class="modal-win glass">
+    <h3>删除这条记忆？</h3>
+    <p id="delTxt"></p>
+    <p class="mono" style="font-size:12px;color:var(--t3)" id="delId"></p>
+    <div class="modal-ops">
+      <button class="btn-glass" data-close="delOv">取消</button>
+      <button class="btn-red" id="delOk">确认删除</button>
+    </div>
+  </div>
+</div>

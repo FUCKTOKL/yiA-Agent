@@ -1,0 +1,40 @@
+<!-- 页面三：提醒；新建弹层随本页 -->
+<section class="page" data-page="reminders">
+  <div class="window glass win-pad">
+    <div class="win-titlebar">
+      <div class="win-head">
+        <h1>提醒</h1>
+        <div class="sub">runtime/jobs.json · 调度守护派发</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn-solid" id="newRemBtn">＋ 新建提醒</button>
+    </div>
+    <div class="hairline"></div>
+    <div class="rem-note">按触发时间排序 · 唯一触发者=调度守护 · 错过自动补发</div>
+    <div class="rem-list scroller" id="remList"></div>
+    <div class="empty-block" id="remEmpty" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+      <p>没有排期中的提醒</p>
+      <button class="btn-glass" id="remEmptyNew">新建一条提醒</button>
+    </div>
+  </div>
+</section>
+
+<!-- 新建提醒 -->
+<div class="overlay" id="remOv">
+  <div class="modal-win glass">
+    <h3>新建提醒</h3>
+    <div class="field"><label>内容</label><input id="nrTxt" placeholder="如：交开题报告初稿"></div>
+    <div class="field"><label>时间（自然语言）</label><input id="nrTime" placeholder="如：明天早上八点"></div>
+    <div class="field"><label>渠道</label>
+      <div class="seg-row">
+        <button class="seg sel" type="button" data-ch="wechat" aria-pressed="true">微信</button>
+        <button class="seg" type="button" data-ch="tui" aria-pressed="false">TUI</button>
+      </div>
+    </div>
+    <div class="modal-ops">
+      <button class="btn-glass" data-close="remOv">取消</button>
+      <button class="btn-solid" id="nrSave">保存</button>
+    </div>
+  </div>
+</div>

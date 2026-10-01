@@ -1,8 +1,9 @@
-/* 公共助手 + 示例数据（原型期静态数据，接 runtime/ 后由后端提供） */
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+/* 模型层：演示数据 + 跨页共享状态。
+   原型期静态数据；接 runtime/ 后由后端提供。
+   memories / rems 为 const 数组，增删一律原地操作（splice/push），各模块拿到的始终是同一份。 */
 
 /* 记忆条目：x/y 为图谱画布坐标（viewBox 800×520） */
-const MEM=[
+export const MEM=[
  {id:'20260914135201-k7x9mf',title:'论文开题待办',sum:'周五前交开题报告初稿：背景与问题定义两节、实验设计引用 GLM 规格、综述复用读书笔记摘录。',tags:['论文进度','待办'],links:['20260905180233-wx9d4m','20260828113307-glm6c8','20260902101544-b7n4q2'],created:'2026-09-14T13:52:01+08:00',x:300,y:190,
   body:'周五前交开题报告初稿：完成研究背景与问题定义两节；实验设计需引用 GLM 上下文规格做可行性论证；文献综述参考《卡片笔记写作法》读书笔记的三条摘录。截止后与项目复盘会同步进度。'},
  {id:'20260905180233-wx9d4m',title:'项目复盘 · 微信换绑事故',sum:'换绑后旧账号未自动登出，提醒重复推送 17 分钟；根因是换绑流程缺少旧会话失效步骤。',tags:['复盘','微信渠道'],links:['20260914135201-k7x9mf','20260828113307-glm6c8','20260906221044-oss5e1'],created:'2026-09-05T18:02:33+08:00',x:520,y:300,
@@ -20,9 +21,13 @@ const MEM=[
 ];
 
 /* 提醒示例 */
-const REMS=[
+export const REMS=[
   {d:'今天',t:'12:39',txt:'E2E 验证',ch:'wechat',done:true},
   {d:'每天',t:'09:30',rep:true,txt:'站会',ch:'wechat'},
   {d:'今天',t:'21:00',txt:'复盘笔记整理',ch:'tui'},
   {d:'明天',t:'08:00',txt:'体检提醒',ch:'wechat'},
 ];
+
+/* 共享可变状态 */
+export const memories=[...MEM];  // 图谱删除时 splice 原地缩减，状态浮层/对话引用同源
+export const rems=[...REMS];     // 提醒增删同上
