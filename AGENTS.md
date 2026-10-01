@@ -38,7 +38,7 @@
 - ✅ 跨平台：Linux/macOS（systemd/launchd）+ **Windows 原生**（bat/ps1/启动文件夹/schtasks）
 
 ### 工程化
-- ✅ 单元测试 34 条（node:test 零依赖）、loadcheck 扩展自检、bench 基准
+- ✅ 单元测试 44 条（node:test 零依赖）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT），双平台 provision 一键部署
@@ -71,7 +71,7 @@
 
 ## 5. 工程约束（提交前检查）
 
-- 提交前（`yiA/` 目录）：`npm test`（34 用例）+ `npm run loadcheck` 必过
+- 提交前（`yiA/` 目录）：`npm test`（44 用例）+ `npm run loadcheck` 必过
 - 单测 node:test 不引第三方；每个 IO 边界有破坏性用例
 - 日志统一走 `yiA/src/logger.ts`（禁记记忆正文/凭据/会话原文；禁散落 console.log）
 - 工具 execute 必返回错误文本；工厂初始化不得抛出拖垮 pi；禁空 catch
