@@ -5,7 +5,7 @@
   --hair:rgba(255,255,255,.16);
   /* 玻璃：带半不透明底色，压平背景照片的亮度波动（纯透明玻璃会让局部亮暗透过，
      看似“色差块”——实测条目与岛底亮差从 ~100 降到 ~25） */
-  --glass:rgba(38,34,30,.80); --glass-sub:rgba(35,32,28,.58);
+  --glass:rgba(35,32,28,.96); --glass-sub:rgba(33,30,26,.72);
   --glass-border:rgba(255,255,255,.20); --glass-border-soft:rgba(255,255,255,.16);
   --row-hover:rgba(255,255,255,.06); --row-hover-strong:rgba(255,255,255,.16);
   --btn-glass-bg:rgba(255,255,255,.14); --btn-glass-hover:rgba(255,255,255,.22);
@@ -31,7 +31,7 @@
 body.light{
   --t1:rgba(43,38,32,.96); --t2:rgba(43,38,32,.78); --t3:rgba(43,38,32,.55);
   --hair:rgba(43,38,32,.14);
-  --glass:rgba(255,253,249,.82); --glass-sub:rgba(255,252,247,.60);
+  --glass:rgba(255,253,249,.96); --glass-sub:rgba(255,252,247,.72);
   --glass-border:rgba(255,255,255,.55); --glass-border-soft:rgba(255,255,255,.50);
   --row-hover:rgba(43,38,32,.05); --row-hover-strong:rgba(255,255,255,.50);
   --btn-glass-bg:rgba(255,255,255,.40); --btn-glass-hover:rgba(255,255,255,.60);
