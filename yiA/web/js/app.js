@@ -24,15 +24,27 @@ export function initShell() {
   $("#themeBtn").onclick = () => applyTheme(document.body.classList.contains("light") ? "dark" : "light");
   applyTheme(localStorage.getItem("yia-theme") || "dark");
 
-  /* 背景上传：即选即用（ponytail: 不持久化，dataURL 超 localStorage 配额，需要时换 IndexedDB） */
+  /* 背景上传：即选即用 + 服务端持久化（runtime/web/bg.img，刷新/换浏览器都继承；
+     存文件而非 dataURL，不受 localStorage 5MB 限制）。双击背景按钮=恢复默认 */
   const bgInput = $("#bgInput");
-  $("#bgBtn").onclick = () => bgInput.click();
+  const setBg = (url) => { const env = $(".env"); env.classList.add("custom"); env.style.background = `url(${url}) center/cover no-repeat`; };
+  $("#bgBtn").onclick = (e) => {
+    if (e.detail === 2) { // 双击恢复默认并清存档
+      const env = $(".env"); env.classList.remove("custom"); env.style.background = "";
+      fetch("/api/bg", { method: "DELETE" }).catch(() => {});
+      return;
+    }
+    bgInput.click();
+  };
   bgInput.onchange = (e) => {
     const f = e.target.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = () => { const env = $(".env"); env.classList.add("custom"); env.style.background = `url(${r.result}) center/cover no-repeat`; };
-    r.readAsDataURL(f);
+    fetch("/api/bg", { method: "POST", headers: { "content-type": f.type }, body: f })
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); setBg("/api/bg?t=" + Date.now()); })
+      .catch((err) => alert("背景保存失败：" + err.message));
+    e.target.value = "";
   };
+  // 启动恢复存档背景
+  fetch("/api/bg").then((r) => { if (r.ok) setBg("/api/bg?t=" + Date.now()); }).catch(() => {});
 
   /* 弹层通用：[data-open] / [data-close] / 点遮罩 / Esc 最上层优先 */
   $$("[data-open]").forEach((b) => (b.onclick = () => $("#" + b.dataset.open).classList.add("show")));

@@ -23,7 +23,7 @@
  *   /*                          → 静态文件 yiA/web/
  */
 import { createServer, type Server } from "node:http";
-import { createReadStream, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import net from "node:net";
@@ -302,6 +302,34 @@ export function createYiaServer(deps: YiaServerDeps): Server {
         }
         if (path === "/api/wechat/rebind/restart" && req.method === "POST") {
           await gatewayCtl("restart");
+          return json(res, 200, { ok: true });
+        }
+
+        // ── 自定义背景：持久化到 runtime/web/，任意浏览器/刷新都继承 ──
+        if (path === "/api/bg" && req.method === "GET") {
+          const metaF = join(root, "runtime", "web", "bg.json");
+          if (!existsSync(metaF)) return json(res, 404, { error: "no bg" });
+          const meta = JSON.parse(readFileSync(metaF, "utf8"));
+          res.writeHead(200, { "content-type": meta.type, "cache-control": "no-cache" });
+          return createReadStream(join(root, "runtime", "web", "bg.img")).pipe(res);
+        }
+        if (path === "/api/bg" && req.method === "POST") {
+          const type = String(req.headers["content-type"] ?? "");
+          if (!/^image\/(png|jpe?g|webp|gif)$/.test(type)) return json(res, 400, { error: "仅支持 png/jpg/webp/gif" });
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const c of req) { size += (c as Buffer).length; if (size > 10 * 1024 * 1024) { req.destroy(); return json(res, 413, { error: "图片超过 10MB" }); } chunks.push(c as Buffer); }
+          if (!size) return json(res, 400, { error: "空 body" });
+          mkdirSync(join(root, "runtime", "web"), { recursive: true });
+          writeFileSync(join(root, "runtime", "web", "bg.img"), Buffer.concat(chunks));
+          writeFileSync(join(root, "runtime", "web", "bg.json"), JSON.stringify({ type, at: new Date().toISOString() }));
+          return json(res, 200, { ok: true });
+        }
+        if (path === "/api/bg" && req.method === "DELETE") {
+          for (const f of ["bg.img", "bg.json"]) {
+            const p = join(root, "runtime", "web", f);
+            if (existsSync(p)) rmSync(p);
+          }
           return json(res, 200, { ok: true });
         }
 
