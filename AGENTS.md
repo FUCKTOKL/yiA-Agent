@@ -76,7 +76,7 @@
 | 网关控制 | 统一 `openclaw gateway start/stop/restart`（自带 systemd/launchd/schtasks 适配），不直接调 systemctl |
 | 换绑语义 | 替换式（1 bot 账号 + 1 推送目标）；账号 id **每次登录都会变**，登录后自动解析写入 wechat.json 的 account 字段 |
 | 微信凭据 | ~/.openclaw/openclaw-weixin/accounts/ 下按文件存；插件不支持 CLI logout，登出=移除凭据文件（备份到 .removed-backup/） |
-| 天气 MCP | 用 Pi 内置 `pi mcp` 配到独立运行时的全局 `mcp.json`，直连暴露；勿改项目 `.mcp.json`（无头会话会被项目服务器信任机制拦截）。数据源 Open-Meteo，零 key |
+| 天气 MCP | 用 Pi 内置 `pi mcp` 配到独立运行时的全局 `mcp.json`，直连暴露；勿改项目 `.mcp.json`（无头会话会被项目服务器信任机制拦截）。数据源 Open-Meteo，零 key。SDK 无头会话不会自动加载 MCP，必须走 `src/chat/session-factory.ts`（显式 createMcpExtension + bindExtensions + `PI_CODING_AGENT_DIR`） |
 | Web 架构 | `src/server/server.ts` 工厂（createYiaServer，DI 可测）+ `scripts/web-server.ts` 薄入口；曾出现双后端并行事故（无测脚本影子实现），合并后禁止另起炉灶 |
 | Web 材质 | Apple 毛玻璃，色底 **.96**：透明材质岛间必有色差（透多少差多少），多轮实测定论，不要回调透明度 |
 | Web 二维码 | 终端 ASCII 码必转 SVG（字符列宽在浏览器不可靠对齐）；剥 ANSI+提取纯█▀▄块再解析模块矩阵 |
@@ -118,6 +118,8 @@
 | 切会话历史叠加 | loadHistory 不清旧 .msg 节点 | 清节点但保留同容器 ctxBar（不能 innerHTML 一刀切） |
 | provision 不可重跑 | 历史游离引号致 bash 语法错 | 已修；bash -n 预检脚本语法 |
 | Web 双后端事故 | 新写 scripts 版影子实现与 src/server 并行（无单测） | 合并回工厂模式；改后端只改 src/server |
+| 微信回 `yia-cli/yia request fail` | Pi 会把上游模型（如 GLM Coding Plan 到期 429）的错误写进 assistant.errorMessage，chat-cli 旧版却只取文本而返回空串 | chat-cli 空文本时返回安全截断的 errorMessage；续订套餐或在 `/login` 换可用模型 |
+| MCP 加入后微信 CLI 不退出 | `AgentSession.dispose()` 不发 session_shutdown，stdio MCP 子进程仍持有事件循环 | 用 `disposeYiaHeadlessSession()` 显式发 session_shutdown 后再 dispose |
 
 ## 7. 文档索引（docs/）
 

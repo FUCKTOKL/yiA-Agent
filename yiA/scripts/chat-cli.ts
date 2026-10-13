@@ -12,7 +12,8 @@
  *
  * 运行环境：WSL 内、项目根为 cwd（由插件 args 保证），扩展/记忆全部可用。
  */
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { createYiaHeadlessSession, disposeYiaHeadlessSession } from "../src/chat/session-factory.ts";
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
@@ -62,11 +63,7 @@ async function main(): Promise<void> {
   const reused = sessionId !== null && existsSync(file);
   const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(root);
 
-  const { session } = await createAgentSession({
-    cwd: root,
-    agentDir: AGENT_DIR, // 独立 agent 目录：模型/凭据/默认设置均从 runtime/agent/ 读
-    sessionManager,
-  });
+  const session = await createYiaHeadlessSession(root, AGENT_DIR, sessionManager);
 
   await session.prompt(prompt);
   if (sessionId && !reused && session.sessionFile) {
@@ -83,9 +80,12 @@ async function main(): Promise<void> {
         .map((c: any) => c.text)
         .join("\n")
     : "";
+  // Pi 会把上游模型错误写入 assistant.errorMessage，但 prompt() 不抛异常；
+  // 不可返回空串，否则 OpenClaw 只会显示笼统的 yia-cli request fail。
+  const result = text || `（yiA 模型请求失败：${String((last as any)?.errorMessage ?? "未返回内容").slice(0, 300)}）`;
 
-  session.dispose();
-  console.log(JSON.stringify({ result: text, session_id: sessionId ?? "default" }));
+  await disposeYiaHeadlessSession(session);
+  console.log(JSON.stringify({ result, session_id: sessionId ?? "default" }));
 }
 
 // 仅作为入口运行时才启动（供单测导入 sessionFileFor）

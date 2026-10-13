@@ -10,7 +10,7 @@
     "web": "NODE_NO_WARNINGS=1 node --experimental-strip-types scripts/web-server.ts"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.85.1"
+    "@earendil-works/pi-coding-agent": "^1.2.0"
   },
   "version": "0.5.0",
   "description": "yiA——个人第二大脑助理（Pi SDK 二次开发：记忆/提醒/微信）",

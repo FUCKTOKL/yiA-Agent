@@ -5,12 +5,13 @@
  */
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { createYiaHeadlessSession, disposeYiaHeadlessSession } from "./session-factory.ts";
 import type { Logger } from "../logger.ts";
 
 interface WebSession {
   prompt(text: string): Promise<string>;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 
 /** 会话 id 白名单（防路径注入；与 chat-cli sessionFileFor 同规则） */
@@ -22,7 +23,10 @@ const cache = new Map<string, WebSession>();
 
 /** 卸载某个会话的缓存实例（删除会话文件前调用，防内存里旧上下文复活） */
 export function disposeSession(session = "web"): void {
-  cache.get(safeId(session))?.dispose();
+  const sid = safeId(session);
+  const s = cache.get(sid);
+  cache.delete(sid);
+  void s?.dispose();
 }
 
 export async function webChat(text: string, root: string, agentDir: string, logger: Logger, session = "web"): Promise<string> {
@@ -33,7 +37,7 @@ export async function webChat(text: string, root: string, agentDir: string, logg
     const reused = existsSync(file);
     // 关键：sessionManager 必须传进 createAgentSession，否则会话落在 pi 默认目录、不续档
     const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(root);
-    const { session } = await createAgentSession({ cwd: root, agentDir, sessionManager });
+    const session = await createYiaHeadlessSession(root, agentDir, sessionManager);
     s = {
       async prompt(t: string) {
         await session.prompt(t);
@@ -49,7 +53,7 @@ export async function webChat(text: string, root: string, agentDir: string, logg
           .map((c: any) => c.text)
           .join("\n");
       },
-      dispose() { session.dispose(); cache.delete(sid); },
+      dispose() { return disposeYiaHeadlessSession(session); },
     };
     cache.set(sid, s);
     logger.info("web 会话建立", { session: sid, reused });
