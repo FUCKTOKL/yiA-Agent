@@ -76,6 +76,13 @@ if [ -d "$HOME/.pi/agent/bin" ] && [ ! -d "$AG/bin" ]; then
   echo "已迁移辅助工具（fd/rg）"
 fi
 
+# 天气 MCP：Pi 原生全局配置，不依赖项目服务器信任确认，微信/Web 无头会话也能调用。
+# add 同名服务器即替换该项，保留用户另配的其他 MCP，故可安全重跑。
+PI_CODING_AGENT_DIR="$AG" pi mcp add weather --cwd "$YIA_ROOT" --exposure direct \
+  --description "yiA 本地天气：Open-Meteo，免 API key，支持中文城市名" -- \
+  node "$YIA_ROOT/sidecar/mcp/weather-mcp.mjs" >/dev/null
+echo "已配置天气 MCP（Open-Meteo，免 API key）"
+
 echo "== 6/9 配置默认模型指向 yiA 大脑 =="
 # 注意：不要在 models 里加 agentRuntime.id —— 那会触发 2026.8.1 的
 # harness 绑定检查（第三方 CLI 后端只注册模型提供者，不注册 harness）

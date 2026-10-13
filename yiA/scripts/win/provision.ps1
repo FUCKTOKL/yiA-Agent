@@ -42,6 +42,13 @@ if (-not (Test-Path $settings)) {
     '{"defaultModel":"glm-5.3","defaultProvider":"zai-coding-cn"}' | Out-File -Encoding utf8 $settings
 }
 
+# 天气 MCP：Pi 原生全局配置，不依赖项目服务器信任确认，微信/Web 无头会话也能调用。
+# add 同名服务器即替换该项，保留用户另配的其他 MCP，故可安全重跑。
+$weatherServer = Join-Path $YiaRoot "sidecar\mcp\weather-mcp.mjs"
+$env:PI_CODING_AGENT_DIR = $Ag
+pi mcp add weather --cwd $YiaRoot --exposure direct --description "yiA 本地天气：Open-Meteo，免 API key，支持中文城市名" -- node $weatherServer | Out-Null
+Write-Host "已配置天气 MCP（Open-Meteo，免 API key）"
+
 # 4) 微信通道配置骨架（token 由用户从 openclaw config get GATEWAY_TOKEN 填写）
 Write-Host "== 4/6 生成 wechat.json 骨架 =="
 New-Item -ItemType Directory -Force -Path $CfgDir | Out-Null

@@ -32,6 +32,10 @@
 - ✅ 发送指定 accountId（多账号防歧义）；僵尸账号条目已从解析排除
 - ○ 群聊（插件能力边界外）
 
+### 外部能力（MCP）
+- ✅ **当地天气**：Pi 原生 MCP 直连 `sidecar/mcp/weather-mcp.mjs`，Open-Meteo 地理编码+天气预报，免 API key；支持中文城市名、当前实况与三日预报
+- ✅ 运行时全局配置 `runtime/agent/mcp.json`（`pi mcp add` 生成），避免微信/Web 无头会话受项目服务器信任确认阻塞；部署脚本会幂等配置
+
 ### yiA 人格（全通道生效）
 - ✅ **记忆管家**：优雅/可靠/克制的英式管家风——口语化短句、称您、禁 Markdown 结构符、办事简短确认不复述（`src/agent/system-prompt.ts`，Web/微信/TUI 同一人格）
 
@@ -51,7 +55,7 @@
 - ○ Web 常驻服务化（现为手动 npm run web）
 
 ### 工程化
-- ✅ 单元测试 44 条（node:test 零依赖）、loadcheck 扩展自检、bench 基准
+- ✅ 单元测试 45 条（node:test 零依赖，含天气 MCP 初始化/工具发现契约）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT，仓库 github.com/FUCKTOKL/yiA-Agent，**当前 PRIVATE 待转公开**）；双平台 provision 一键部署
@@ -72,6 +76,7 @@
 | 网关控制 | 统一 `openclaw gateway start/stop/restart`（自带 systemd/launchd/schtasks 适配），不直接调 systemctl |
 | 换绑语义 | 替换式（1 bot 账号 + 1 推送目标）；账号 id **每次登录都会变**，登录后自动解析写入 wechat.json 的 account 字段 |
 | 微信凭据 | ~/.openclaw/openclaw-weixin/accounts/ 下按文件存；插件不支持 CLI logout，登出=移除凭据文件（备份到 .removed-backup/） |
+| 天气 MCP | 用 Pi 内置 `pi mcp` 配到独立运行时的全局 `mcp.json`，直连暴露；勿改项目 `.mcp.json`（无头会话会被项目服务器信任机制拦截）。数据源 Open-Meteo，零 key |
 | Web 架构 | `src/server/server.ts` 工厂（createYiaServer，DI 可测）+ `scripts/web-server.ts` 薄入口；曾出现双后端并行事故（无测脚本影子实现），合并后禁止另起炉灶 |
 | Web 材质 | Apple 毛玻璃，色底 **.96**：透明材质岛间必有色差（透多少差多少），多轮实测定论，不要回调透明度 |
 | Web 二维码 | 终端 ASCII 码必转 SVG（字符列宽在浏览器不可靠对齐）；剥 ANSI+提取纯█▀▄块再解析模块矩阵 |
@@ -88,7 +93,7 @@
 
 ## 5. 工程约束（提交前检查）
 
-- 提交前（`yiA/` 目录）：`npm test`（44 用例）+ `npm run loadcheck` 必过
+- 提交前（`yiA/` 目录）：`npm test`（45 用例）+ `npm run loadcheck` 必过
 - 单测 node:test 不引第三方；每个 IO 边界有破坏性用例
 - 日志统一走 `yiA/src/logger.ts`（禁记记忆正文/凭据/会话原文；禁散落 console.log）
 - 工具 execute 必返回错误文本；工厂初始化不得抛出拖垮 pi；禁空 catch
