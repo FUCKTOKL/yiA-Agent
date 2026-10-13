@@ -2,6 +2,7 @@ import {
   createAgentSession,
   createMcpExtension,
   DefaultResourceLoader,
+  ModelRuntime,
   type AgentSession,
   SessionManager,
   SettingsManager,
@@ -17,6 +18,15 @@ export async function createYiaHeadlessSession(root: string, agentDir: string, s
   // createMcpExtension 的默认配置加载器从环境取 agentDir，SDK options 不会自动同步它。
   process.env.PI_CODING_AGENT_DIR = agentDir;
   const settingsManager = SettingsManager.create(root, agentDir);
+  const modelRuntime = await ModelRuntime.create({
+    authPath: join(agentDir, "auth.json"),
+    modelsPath: join(agentDir, "models.json"),
+  });
+  // 微信会话会续用历史 JSONL；显式传当前默认模型，切换后无需删旧会话也能生效。
+  const provider = settingsManager.getDefaultProvider();
+  const modelId = settingsManager.getDefaultModel();
+  const model = provider && modelId ? modelRuntime.getModel(provider, modelId) : undefined;
+  if (provider && modelId && !model) throw new Error(`默认模型不可用：${provider}/${modelId}`);
   const resourceLoader = new DefaultResourceLoader({
     cwd: root,
     agentDir,
@@ -32,6 +42,8 @@ export async function createYiaHeadlessSession(root: string, agentDir: string, s
     agentDir,
     sessionManager,
     settingsManager,
+    modelRuntime,
+    ...(model ? { model } : {}),
     resourceLoader,
   });
   // 触发 session_start：连接 runtime/agent/mcp.json 中的 MCP 服务器。

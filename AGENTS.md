@@ -69,7 +69,7 @@
 |---|---|
 | 环境 | WSL Ubuntu 24.04 开发；**已支持 Windows 原生**（v0.5.0 起跨平台） |
 | 目录 | 代码全在 `yiA/`；数据 `runtime/`（gitignored 可整体备份）；加载器 `.pi/extensions/`；文档 `docs/` |
-| 运行时独立 | agentDir=`runtime/agent/`（settings/auth/models-store/sessions），与个人 `~/.pi/agent` 零共享；`PI_CODING_AGENT_DIR` 隔离 |
+| 运行时独立 | agentDir=`runtime/agent/`（settings/auth/models-store/sessions），与个人 `~/.pi/agent` 零共享；`PI_CODING_AGENT_DIR` 隔离。切模型须同时改此处 `settings.json` 的 defaultProvider/defaultModel，不认个人 Pi 设置；无头会话显式使用当前默认模型，旧微信会话不再绑定旧模型 |
 | 记忆三层 | L1 画像(JSON) / L2 知识库(MD+BM25) / L3 会话(FTS5)，阈值门控召回 |
 | 提醒触发 | **唯一触发者=yia-scheduler 常驻守护**（Linux systemd / Windows 启动文件夹），TUI/chat-cli 不跑 runner 防双发 |
 | 微信架构 | OpenClaw Gateway(2026.8.2 锁定) + @tencent-weixin 插件 + yia-cli CLI 后端（stdin 进消息/stdout JSON） |

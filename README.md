@@ -56,6 +56,27 @@ yiA   # TUI；或 node yiA/scripts/chat-cli.ts < 无头自检
 2. `/wechat` → 扫码登录你的 bot 微信号 → 用个人号给 bot 发消息 → 输配对码批准 → 填推送目标
 3. 验证：微信里说"提醒我 2 分钟后测试"，到点手机应响
 
+### 模型切换（微信也使用这一份配置）
+
+yiA 与个人 Pi 的模型设置完全隔离。微信、Web 和 `yiA` 命令只读取仓库根的
+`runtime/agent/settings.json`；仅在 `~/.pi/agent/` 或个人 Pi TUI 里切换模型，不会影响微信。
+
+跨供应商时必须同时改 `defaultProvider` 与 `defaultModel`。例如已接入 OpenAI Codex 时，把
+`runtime/agent/settings.json` 中的两个字段改为：
+
+```json
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5"
+}
+```
+
+请保留文件中的其他字段。可用模型 id 从 `runtime/agent/models-store.json` 对应 provider 的
+`models` 列表查询。微信下一条消息会读取新设置；它会保留聊天历史，但不会再被旧会话的模型绑定。
+
+Web 的 `/login` 只保存或更新 API key；确认 provider/model 后再按上面的配置切换。当前默认
+模型可在 Web `/login` 的状态文字，或 `runtime/agent/settings.json` 中核对。
+
 ## Web 界面（M6.1）
 
 ```bash
