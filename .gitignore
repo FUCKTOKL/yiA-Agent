@@ -1,5 +1,7 @@
 node_modules/
 runtime/
+# 本机待导入原书，不随代码分发
+/book/
 *.log
 .DS_Store
 Thumbs.db

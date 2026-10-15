@@ -10,9 +10,16 @@
     "web": "NODE_NO_WARNINGS=1 node --experimental-strip-types scripts/web-server.ts"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^1.2.0"
+    "@earendil-works/pi-coding-agent": "^1.2.0",
+    "@types/yauzl": "^3.4.0"
   },
   "version": "0.5.0",
   "description": "yiA——个人第二大脑助理（Pi SDK 二次开发：记忆/提醒/微信）",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": { "node": ">=22.13.0" },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "pdfjs-dist": "^6.4.299",
+    "yauzl": "^3.4.0"
+  }
 }

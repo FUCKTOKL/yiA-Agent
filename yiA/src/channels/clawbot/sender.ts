@@ -8,10 +8,10 @@
  * ponytail: 当前每次消息一个 HTTP 请求；后续量大可换 WS 长连接复用。
  */
 
-import type { Logger } from "../logger.ts";
+import type { Logger } from "../../logger.ts";
 import type { WechatConfig } from "../wechat-config.ts";
 
-export class ClawbotSender implements ChannelSender {
+export class ClawbotSender {
   private readonly config: WechatConfig;
   private readonly logger: Logger;
   private readonly fetchImpl: typeof fetch;

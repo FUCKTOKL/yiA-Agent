@@ -64,6 +64,17 @@ export const api = {
   memory: (q = "") => req("GET", `/api/memory?q=${encodeURIComponent(q)}`),
   refineMemory: (id, patch) => req("POST", `/api/memory/${id}`, patch),
   deleteMemory: (id) => req("DELETE", `/api/memory/${id}`),
+  books: () => req("GET", "/api/books"),
+  searchBooks: (query, bookId = "") => req("GET", `/api/books/search?q=${encodeURIComponent(query)}&bookId=${encodeURIComponent(bookId)}`),
+  bookPassage: (id, passage) => req("GET", `/api/books/${encodeURIComponent(id)}/passages/${passage}`),
+  bookOriginal: (id) => `/api/books/${encodeURIComponent(id)}/original`,
+  deleteBook: (id) => req("DELETE", `/api/books/${encodeURIComponent(id)}`),
+  async importBook(file) {
+    const res = await fetch(`/api/books/import?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });
+    const data = await res.json().catch(() => ({ error: `导入响应不完整（HTTP ${res.status}），请刷新书架确认结果。` }));
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+    return data;
+  },
   reminders: () => req("GET", "/api/reminders"),
   addReminder: (p) => req("POST", "/api/reminders", p),
   cancelReminder: (id) => req("DELETE", `/api/reminders/${id}`),

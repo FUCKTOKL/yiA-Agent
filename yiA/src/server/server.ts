@@ -38,6 +38,7 @@ import { runCapture, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPee
 import { Logger } from "../logger.ts";
 import { loadModelCatalog, type ModelChoice } from "./model-catalog.ts";
 import { EMPTY_REPLY_MESSAGE, formatReplyError } from "../chat/reply.ts";
+import { createBookRoutes } from "./book-routes.ts";
 
 export interface YiaServerDeps {
   root: string;
@@ -93,6 +94,7 @@ export function createYiaServer(deps: YiaServerDeps): Server {
   const webDir = resolve(root, "yiA", "web");
   const agentDir = deps.agentDir ?? join(root, "runtime", "agent");
   const modelCatalog = deps.modelCatalog ?? (() => loadModelCatalog(agentDir));
+  const bookRoutes = createBookRoutes(root, logger);
 
   const json = (res: any, code: number, body: unknown) => {
     res.writeHead(code, { "content-type": "application/json; charset=utf-8" });
@@ -126,12 +128,14 @@ export function createYiaServer(deps: YiaServerDeps): Server {
     return out.slice(-40);
   };
 
-  return createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const path = decodeURIComponent(url.pathname);
+  const server = createServer(async (req, res) => {
+    let path = "/";
     try {
+      const url = new URL(req.url ?? "/", "http://localhost");
+      path = decodeURIComponent(url.pathname);
       // ── API ──
       if (path.startsWith("/api/")) {
+        if (path === "/api/books" || path.startsWith("/api/books/")) return await bookRoutes.handle(req, res, url);
         // L2 索引刷新：对话/微信等其他进程会写条目，长驻服务器的内存索引需重读
         // ponytail: 每请求重读整目录，万条内可接受；上万条换 fs.watch 增量
         if (path.startsWith("/api/memory") || path === "/api/status" || path === "/api/context") l2.reload();
@@ -474,8 +478,10 @@ export function createYiaServer(deps: YiaServerDeps): Server {
       createReadStream(file).pipe(res);
     } catch (e) {
       logger.error("web 请求处理失败", { path, error: String(e).slice(0, 300) });
-      if (!res.headersSent) json(res, e instanceof MemoryConflictError ? 409 : 500, { error: String(e).slice(0, 500) });
+      if (!res.headersSent) json(res, e instanceof MemoryConflictError ? 409 : e instanceof URIError ? 400 : 500, { error: e instanceof URIError ? "请求地址编码不正确。" : String(e).slice(0, 500) });
       else res.end();
     }
   });
+  server.once("close", bookRoutes.close);
+  return server;
 }

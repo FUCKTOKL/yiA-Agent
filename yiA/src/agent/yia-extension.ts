@@ -4,7 +4,7 @@
  * 这是与 Pi SDK 集成的入口：导出一个默认工厂函数，
  * Pi 启动时通过 jiti 加载本文件并调用工厂，拿到 ExtensionAPI 后完成：
  *   1. 初始化三层记忆（L1 画像 / L2 知识库 / L3 会话索引）与统一日志
- *   2. 注册 remember / recall / refine / update_profile 四个工具
+ *   2. 注册记忆、提醒与只读查书工具（书籍库延迟打开）
  *   3. session_start 时增量同步 L3 会话索引
  *   4. 每轮对话前注入 yiA 记忆规范 + ContextPack（画像 + 门控召回）
  *
@@ -24,6 +24,7 @@ import { JobStore } from "../scheduler/job-store.ts";
 import { buildContextPack } from "../memory/context-pack.ts";
 import { registerMemoryTools } from "./tools.ts";
 import { registerReminderTools } from "./reminder-tools.ts";
+import { registerBookTools } from "./book-tools.ts";
 import { registerYiaCommands } from "./commands.ts";
 import { YIA_MEMORY_PROMPT } from "./system-prompt.ts";
 
@@ -62,6 +63,7 @@ export default function (pi: ExtensionAPI) {
   );
   registerMemoryTools(pi, { l1, l2, logger });
   registerReminderTools(pi, { store: jobs, logger });
+  const closeBooks = registerBookTools(pi, { root, logger });
   // M5 自定义命令：/reminder /wechat /brain
   registerYiaCommands(pi, { root, jobs, l2 });
 
@@ -81,6 +83,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async () => {
     l3?.close();
+    closeBooks();
   });
 
   // 3) 每轮开始前：记忆规范 + ContextPack（当前时间 + 画像 + L2/L3 门控召回）

@@ -1,9 +1,10 @@
 /** 对话页：回复与失败状态都明确显示，历史和实时消息使用相同的安全文本渲染。 */
 import { $, $$, api } from "./api.js";
 import { openFocus } from "./memory.js";
+import { openBookCitation } from "./books.js";
 
 const chatScroll = $("#chatScroll"), chatInput = $("#chatInput"), sendBtn = $("#sendBtn");
-const ID_RE = /\b(\d{14}-[a-z0-9]{4,8})\b/g;
+const ID_RE = /\b(?:\d{14}-[a-z0-9]{4,8}|bk_[a-f0-9]{24}:[1-9]\d*)\b/g;
 let memIndex = [];
 api.memory().then((d) => { memIndex = d.entries; }).catch(() => {});
 let activeSession = "web", busy = false;
@@ -29,8 +30,13 @@ function renderBody(body, text, error = false) {
   let offset = 0;
   for (const match of value.matchAll(ID_RE)) {
     body.append(document.createTextNode(value.slice(offset, match.index)));
-    const ref = node("span", "hl", match[0]);
-    ref.dataset.id = match[0];
+    const isBook = match[0].startsWith("bk_");
+    const ref = node(isBook ? "button" : "span", isBook ? "book-cite" : "hl", match[0]);
+    if (isBook) {
+      ref.type = "button";
+      ref.setAttribute("aria-label", "查看书籍原文 " + match[0]);
+      ref.onclick = () => { const [id, n] = match[0].split(":"); void openBookCitation(id, Number(n)); };
+    } else ref.dataset.id = match[0];
     body.append(ref);
     offset = match.index + match[0].length;
   }

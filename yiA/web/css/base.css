@@ -217,5 +217,5 @@ button:active:not(:disabled){transform:translateY(1px)}
   .modal-win,.focus-win{max-height:calc(100dvh - 32px)}
   .modal-ops{flex-wrap:wrap;gap:10px}
 }
-@media(max-width:520px){.brand{display:none}.tool-btn{width:36px;height:36px}.nav-btn{flex:none}}
+@media(max-width:520px){.brand{display:none}.rail{gap:2px}.tool-btn,.status-btn{width:32px;height:36px}.nav-btn{flex:none;width:clamp(32px,10vw,40px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

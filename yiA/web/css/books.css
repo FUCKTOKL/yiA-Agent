@@ -1,0 +1,39 @@
+/* 书架沿用共用玻璃与标题基线：左侧目录，右侧原文，不另造卡片材质。 */
+.book-library{flex:0 0 40%}
+.book-reader{flex:1}
+.book-library .win-titlebar>.btn-glass{margin-top:2px}
+.book-controls{display:flex;align-items:center;gap:10px;min-width:0;font-size:12px;color:var(--t3)}
+.book-controls select{flex:1;min-width:0;max-width:100%;border:1px solid var(--input-border);border-radius:12px;padding:8px 10px;background:var(--input-bg);color:var(--t1);font:inherit;color-scheme:dark}
+body.light .book-controls select{color-scheme:light}
+.book-help,.book-privacy{font-size:12px;line-height:1.7;color:var(--t3);margin-top:10px}
+.book-privacy{flex:none;margin-top:16px;border-top:1px solid var(--hair);padding-top:12px}
+.book-feedback{font-size:13px;line-height:1.65;color:var(--t2);padding:10px 0;overflow-wrap:anywhere}
+.book-feedback.is-error{color:var(--accent)}
+.book-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:16px 0 4px}
+.book-list{flex:1;min-height:0}
+.book-row,.book-hit{display:block;width:100%;border:0;border-bottom:1px solid var(--hair);padding:17px 4px;background:transparent;color:var(--t1);text-align:left;font-family:var(--sans);cursor:pointer;border-radius:8px}
+.book-row:hover,.book-hit:hover,.book-row.is-selected{background:var(--btn-sub)}
+.book-row{display:flex;align-items:flex-start;gap:14px}
+.book-format{width:34px;min-height:43px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid var(--input-border);border-left:3px solid var(--t3);border-radius:2px 5px 5px 2px;font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:2px}
+.book-row-body{min-width:0}
+.book-row h3,.book-hit h3{font-size:15px;line-height:1.6;font-weight:500;overflow-wrap:anywhere}
+.book-row p,.book-hit .book-hit-meta{font-size:12px;color:var(--t3);line-height:1.7;margin-top:5px;overflow-wrap:anywhere}
+.book-hit .book-excerpt{font-size:13px;line-height:1.8;color:var(--t2);margin-top:9px;display:-webkit-box;-webkit-line-clamp:4;line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.book-hit mark{background:var(--accent-bg);color:var(--t1);border-radius:2px}
+.book-read-content{display:flex;flex-direction:column;flex:1;min-height:0;gap:14px}
+.book-reader h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-source{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;font-size:12px;line-height:1.7;color:var(--t3)}
+.book-source span{min-width:0;overflow-wrap:anywhere}
+.book-source a{flex:none;text-decoration:underline;text-underline-offset:3px}
+.book-text{flex:1;min-height:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.95;color:var(--t2);padding:4px 12px 8px 0}
+.book-text:focus-visible{outline:1px solid var(--t3);outline-offset:3px;border-radius:4px}
+.book-warning{font-size:12px;line-height:1.7;color:var(--t3);border-left:2px solid var(--t3);padding-left:10px}
+.book-citation{font-family:var(--mono);font-size:11px;color:var(--t3);overflow-wrap:anywhere;user-select:all}
+.book-pager{display:flex;align-items:center;gap:10px;border-top:1px solid var(--hair);padding-top:14px;flex-wrap:wrap}
+.book-pager>span{font-size:12px;color:var(--t3);font-family:var(--mono)}
+.book-pager>.danger{margin-left:auto}
+#bookDeleteName{overflow-wrap:anywhere}
+#bookDeleteError{color:var(--accent)}
+.book-cite{display:inline;border:0;border-bottom:1px solid var(--t3);border-radius:0;background:none;color:inherit;font:inherit;cursor:pointer;overflow-wrap:anywhere}
+@media(max-width:1000px){.book-library{flex-basis:44%}.book-row{gap:10px}.book-format{display:none}.book-pager{gap:8px}.book-source{flex-wrap:wrap}}
+@media(max-width:760px){.book-library{flex:0 0 560px}.book-reader{flex:0 0 620px}.book-format{display:flex}.book-text{font-size:15px}.book-reader .win-pad{padding-bottom:18px}}

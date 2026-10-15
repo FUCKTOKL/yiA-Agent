@@ -50,11 +50,11 @@ globalThis.Option = function (text = "", value = "") {
 globalThis.document = doc as unknown as Document;
 globalThis.window = { addEventListener: () => {}, location: { reload() {} } } as unknown as Window & typeof globalThis;
 globalThis.localStorage = { getItem: () => null, setItem: () => {} } as unknown as Storage;
-globalThis.fetch = async () => new Response(JSON.stringify({ entries: [], msgs: [], pending: [], done: [], enabled: false, models: [], auth: {}, sessions: [] }));
+globalThis.fetch = async () => new Response(JSON.stringify({ entries: [], msgs: [], pending: [], done: [], enabled: false, models: [], auth: {}, sessions: [], books: [] }));
 globalThis.requestAnimationFrame = () => 0;
 
 test("index.html 覆盖全部 js 顶层引用的 id（防断链复发）", () => {
-  for (const f of ["app.js", "chat.js", "memory.js", "reminders.js", "wechat.js", "status.js", "models.js", "dialogs.js"]) {
+  for (const f of ["app.js", "chat.js", "memory.js", "reminders.js", "wechat.js", "status.js", "models.js", "dialogs.js", "books.js"]) {
     const src = readFileSync(join(webDir, "js", f), "utf8");
     // 顶层模块作用域的纯 id 引用（含字符串模板外的调用点）
     for (const m of src.matchAll(/\$\("#([a-zA-Z][\w-]*)"\)/g)) {

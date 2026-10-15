@@ -61,12 +61,14 @@ export function initShell() {
 /* ===== 启动入口（原 main.js 并入，减一层转发；动态 import 避免环） ===== */
 const { initChat } = await import("./chat.js");
 const { initMemory } = await import("./memory.js");
+const { initBooks } = await import("./books.js");
 const { initReminders } = await import("./reminders.js");
 const { initWechat } = await import("./wechat.js");
 const { initModelSettings } = await import("./models.js");
 initShell();
 initChat();
 initMemory();
+initBooks();
 initReminders();
 initWechat();
 initModelSettings();

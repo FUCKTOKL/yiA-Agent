@@ -29,8 +29,8 @@ if (errs.length) {
   process.exit(1);
 }
 const tools = session.agent.state.tools.map((t) => t.name);
-for (const want of ["remember", "recall"]) {
+for (const want of ["remember", "recall", "list_books", "search_books", "read_book_passage"]) {
   if (!tools.includes(want)) throw new Error(`工具未注册: ${want}`);
 }
 session.dispose();
-console.log("yiA 扩展加载 ✓ (remember + recall 已注册)");
+console.log("yiA 扩展加载 ✓ (记忆工具 + 书架/全文检索/原文阅读工具已注册)");
