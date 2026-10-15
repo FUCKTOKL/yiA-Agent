@@ -1,59 +1,71 @@
 /**
- * 提醒触发器（PRD F2.3）：周期检查到期任务 → 通知 → 记流水 → 完成或顺延。
- *
- * - 检查间隔 30s（提醒分钟级精度足够）
- * - 错过补发：进程启动时（start 的首次 check）把早于启动时间的到期任务
- *   一次性补发并标记"错过"；重复任务顺延到下一个未来周期点
- * - 通知失败不标记完成，下轮重试（成功指标"提醒零漏发"优先于防重复）
- *   ponytail: 若通知通道持续故障会每 30s 重试一次，M4 接微信后加退避
+ * 提醒触发器：周期检查到期任务 → 等待通知成功 → 记流水 → 完成或顺延。
+ * 通知失败保留 pending，下轮重试；一次只跑一轮，慢推送不会被下个周期重复发送。
+ * shortcut: 发送成功后若进程在落盘前崩溃，重启可能补发；优先避免漏发，非严格恰好一次。
  */
-import type { Job } from "../scheduler/job-store.ts";
+import type { Job, JobStore } from "./job-store.ts";
 import type { Logger } from "../logger.ts";
+
+type Notify = (job: Job, text: string) => void | Promise<void>;
 
 export class ReminderRunner {
   private readonly store: JobStore;
-  private readonly notify: (job: Job, text: string) => void;
+  private readonly notify: Notify;
   private readonly logger: Logger;
-  /** 本次进程启动时间：早于此的到期任务视为"错过" */
   private readonly startedAt: number;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private checking: Promise<Job[]> | undefined;
 
-  constructor(store: JobStore, notify: (job: Job, text: string) => void, logger: Logger) {
+  constructor(store: JobStore, notify: Notify, logger: Logger) {
     this.store = store;
     this.notify = notify;
     this.logger = logger;
     this.startedAt = Date.now();
   }
 
-  /** 启动：立即查一遍（补发错过的），然后周期检查 */
+  /** 启动时立即补发，之后每 30 秒检查；顶层异常不变成未处理的 Promise。 */
   start(intervalMs = 30_000): void {
-    this.check();
-    this.timer = setInterval(() => this.check(), intervalMs);
+    if (this.timer) return;
+    const tick = () => {
+      void this.check().catch((e) => {
+        this.logger.error("提醒检查失败，下一轮重试", { error: String(e) });
+      });
+    };
+    tick();
+    this.timer = setInterval(tick, intervalMs);
   }
 
-  /** 停止（session_shutdown 时调用） */
-  stop(): void {
+  /** 停止新检查，并等待已发出的请求和任务落盘，避免重启时切断收尾。 */
+  async stop(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    await this.checking;
   }
 
-  /** 检查并触发所有到期任务，返回本次触发的任务 */
-  check(now: Date = new Date()): Job[] {
+  check(now: Date = new Date()): Promise<Job[]> {
+    if (!this.checking) {
+      this.checking = this.runCheck(now).finally(() => { this.checking = undefined; });
+    }
+    return this.checking;
+  }
+
+  private async runCheck(now: Date): Promise<Job[]> {
     const fired: Job[] = [];
     for (const job of this.store.pending()) {
-      if (new Date(job.at).getTime() > now.getTime()) continue; // 未到点
+      if (new Date(job.at).getTime() > now.getTime()) continue;
+      // 前一条推送等待期间，用户可能已在另一通道取消这一条。
+      if (this.store.byId(job.id)?.status !== "pending") continue;
       const missed = new Date(job.at).getTime() < this.startedAt;
       const text = `⏰ 提醒${missed ? "（错过补发）" : ""}：${job.title}`;
       try {
-        this.notify(job, text);
+        await this.notify(job, text);
         this.store.appendRun(job, missed ? "missed" : "fired");
+        this.store.finishOrReschedule(job.id, now);
         this.logger.info("提醒触发", { id: job.id, missed });
+        fired.push(job);
       } catch (e) {
-        this.logger.error("提醒通知失败，下一轮重试", { id: job.id, error: String(e) });
-        continue; // 不标记完成，等下轮重试
+        this.logger.error("提醒通知或收尾失败，下一轮重试", { id: job.id, error: String(e) });
       }
-      this.store.finishOrReschedule(job.id, now);
-      fired.push(job);
     }
     return fired;
   }

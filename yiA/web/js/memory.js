@@ -1,5 +1,5 @@
 /** 记忆图谱页：真实 L2 数据 + 确定性力导向布局 + 双向联动 + 聚焦层（查看/编辑/删除走 API） */
-import { $, $$, esc, api } from "./api.js";
+import { $, $$, api } from "./api.js";
 
 let memories = []; // {id,title,sum,tags,links,created,body,x,y}
 const byId = (id) => memories.find((m) => m.id === id);
@@ -7,7 +7,17 @@ const neighbors = (id) => byId(id)?.links ?? [];
 const fileList = $("#fileList"), memCount = $("#memCount"), memEmpty = $("#memEmpty");
 let query = "", hoverId = null;
 
-const ID_RE = /(\d{14}-[a-z0-9]{4,8})/g;
+const node = (tag, className, text) => {
+  const el = document.createElement(tag);
+  el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+};
+const svgNode = (tag, attrs) => {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value));
+  return el;
+};
 const summarize = (e) => {
   const body = (e.content ?? "").replace(/[#*`>]/g, "").replace(/\s+/g, " ").trim();
   return { ...e, sum: body.slice(0, 72) + (body.length > 72 ? "…" : ""), body: e.content ?? "" };
@@ -38,12 +48,14 @@ function layout() {
 
 /* ===== 左岛列表 ===== */
 function renderList() {
-  fileList.innerHTML = memories.map((m) => `
-    <div class="file-row glass-sub" data-id="${m.id}">
-      <h3>${esc(m.title)}${m.links.length >= 3 ? '<span class="hub-badge">枢纽</span>' : ""}</h3>
-      <p>${esc(m.sum)}</p>
-      <div class="meta">${m.id} · ↔${m.links.length} · ${esc(m.tags.join(" · "))}</div>
-    </div>`).join("");
+  fileList.replaceChildren(...memories.map((m) => {
+    const row = node("div", "file-row glass-sub");
+    row.dataset.id = m.id;
+    const title = node("h3", "", m.title);
+    if (m.links.length >= 3) title.append(node("span", "hub-badge", "枢纽"));
+    row.append(title, node("p", "", m.sum), node("div", "meta", `${m.id} · ↔${m.links.length} · ${m.tags.join(" · ")}`));
+    return row;
+  }));
   $$("#fileList .file-row").forEach((r) => {
     const id = r.dataset.id;
     r.onmouseenter = () => { hoverId = id; applyState(); };
@@ -66,13 +78,18 @@ const edgePairs = () => {
 function renderGraph() {
   gview.setAttribute("transform", ""); view = { x: 0, y: 0 };
   const es = edgePairs();
-  let h = es.map(([a, b]) => `<line class="edge" data-a="${a}" data-b="${b}" x1="${byId(a).x}" y1="${byId(a).y}" x2="${byId(b).x}" y2="${byId(b).y}"/>`).join("");
-  h += memories.map((m) => {
+  const lines = es.map(([a, b]) => svgNode("line", {
+    class: "edge", "data-a": a, "data-b": b,
+    x1: byId(a).x, y1: byId(a).y, x2: byId(b).x, y2: byId(b).y,
+  }));
+  const nodes = memories.map((m) => {
     const hub = m.links.length >= 3;
-    return `<g class="node" data-id="${m.id}">${hub ? `<circle class="hub-halo" cx="${m.x}" cy="${m.y}" r="15" fill="#E26252"/>` : ""}
-      <circle class="${hub ? "hubc" : "core"}" cx="${m.x}" cy="${m.y}" r="${hub ? 9 : 5.5}"/></g>`;
-  }).join("");
-  gview.innerHTML = h;
+    const g = svgNode("g", { class: "node", "data-id": m.id });
+    if (hub) g.append(svgNode("circle", { class: "hub-halo", cx: m.x, cy: m.y, r: 15, fill: "#E26252" }));
+    g.append(svgNode("circle", { class: hub ? "hubc" : "core", cx: m.x, cy: m.y, r: hub ? 9 : 5.5 }));
+    return g;
+  });
+  gview.replaceChildren(...lines, ...nodes);
   nodeEls = {}; edgeEls = [...gview.querySelectorAll(".edge")];
   gview.querySelectorAll(".node").forEach((g) => {
     nodeEls[g.dataset.id] = g;
@@ -174,10 +191,11 @@ $("#fbToggle").onclick = () => {
   const on = $("#fbToggle").classList.toggle("on");
   graphWrapEl.style.display = on ? "none" : "";
   fbList.hidden = !on;
-  if (on) fbList.innerHTML = memories.map((m) => `
-    <div class="fb-row glass-sub">${esc(m.title)}
-      <span class="mono">↔${m.links.length} · ${m.links.map((l) => l.split("-")[1]).join(" ") || "—"}</span>
-    </div>`).join("") || '<div class="empty-block"><p>没有记忆条目</p></div>';
+  if (on) fbList.replaceChildren(...(memories.length ? memories.map((m) => {
+    const row = node("div", "fb-row glass-sub", m.title + " ");
+    row.append(node("span", "mono", `↔${m.links.length} · ${m.links.map((l) => l.split("-")[1]).join(" ") || "—"}`));
+    return row;
+  }) : [node("div", "empty-block", "没有记忆条目")]));
 };
 
 /* ===== 聚焦阅读层（导出给 chat.js 引用芯片用） ===== */
@@ -206,7 +224,7 @@ $("#fEdit").onclick = () => {
 };
 $("#edSave").onclick = async () => {
   try {
-    await api.refineMemory(editing.id, { title: $("#edTitle").value.trim() || editing.title, content: $("#edBody").value.trim() });
+    await api.refineMemory(editing.id, { title: $("#edTitle").value.trim() || editing.title, content: $("#edBody").value.trim(), expectedVersion: editing.version });
     $("#editOv").classList.remove("show"); closeFocus();
     await reload();
   } catch (e) { alert(`保存失败：${e.message}`); }
@@ -236,6 +254,10 @@ export async function reload() {
 }
 export async function initMemory() {
   try { await reload(); } catch (e) {
-    fileList.innerHTML = `<div class="empty-block"><p>读取失败：${esc(e.message)}</p><button class="btn-glass" onclick="location.reload()">重试</button></div>`;
+    const block = node("div", "empty-block");
+    const retry = node("button", "btn-glass", "重试");
+    retry.onclick = () => location.reload();
+    block.append(node("p", "", `读取失败：${e.message}`), retry);
+    fileList.replaceChildren(block);
   }
 }

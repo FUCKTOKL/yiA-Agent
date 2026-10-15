@@ -29,7 +29,7 @@ export function registerReminderTools(pi: ExtensionAPI, deps: ReminderDeps): voi
   const { store, logger } = deps;
   const fail = (e: unknown) => {
     logger.error("提醒工具执行失败", { error: String(e) });
-    return { content: [{ type: "text", text: `工具执行出错：${String(e)}` }], details: {}, isError: true };
+    return { content: [{ type: "text" as const, text: `工具执行出错：${String(e)}` }], details: {}, isError: true };
   };
 
   // ---- 建 ----

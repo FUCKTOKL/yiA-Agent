@@ -39,10 +39,10 @@ test("jobs.json 损坏 → 备份 .bak 并从空表降级", () => {
 test("到点触发：check 触发到期任务并记流水、标记完成", async () => {
   const s = new JobStore(jobsFile, runsFile);
   const fired: string[] = [];
-  const runner = new ReminderRunner(s, (_j, t) => fired.push(t), logger);
+  const runner = new ReminderRunner(s, (_j, t) => { fired.push(t); }, logger);
   s.add({ title: "开会", at: inSec(0.05), channel: "tui" }); // 50ms 后到期（未错过）
   await new Promise((r) => setTimeout(r, 100));
-  const out = runner.check();
+  const out = await runner.check();
   assert.equal(out.length, 1);
   assert.equal(fired.length, 1);
   assert.match(fired[0], /开会/);
@@ -52,45 +52,84 @@ test("到点触发：check 触发到期任务并记流水、标记完成", async
   assert.ok(runs.some((l) => l.includes("开会") && l.includes("fired")));
 });
 
-test("未到点不触发", () => {
+test("未到点不触发", async () => {
   const s = new JobStore(jobsFile, runsFile);
   const runner = new ReminderRunner(s, (_j, _t) => {}, logger);
   s.add({ title: "未来的事", at: inSec(3600), channel: "tui" });
-  assert.equal(runner.check().length, 0);
+  assert.equal((await runner.check()).length, 0);
 });
 
-test("重复任务：触发后顺延到下一个未来周期点", () => {
+test("重复任务：触发后顺延到下一个未来周期点", async () => {
   const s = new JobStore(jobsFile, runsFile);
   const runner = new ReminderRunner(s, (_j, _t) => {}, logger);
   const j = s.add({ title: "吃药", at: inSec(-10), channel: "tui", repeatDays: 1 });
-  runner.check();
+  await runner.check();
   const now = s.byId(j.id)!;
   assert.equal(now.status, "pending", "重复任务保持待触发");
   assert.ok(new Date(now.at).getTime() > Date.now(), "at 已顺延到未来");
 });
 
-test("错过补发：过期任务触发并标记 missed", () => {
+test("错过补发：过期任务触发并标记 missed", async () => {
   const s = new JobStore(jobsFile, runsFile);
   const fired: string[] = [];
-  const runner = new ReminderRunner(s, (_j, t) => fired.push(t), logger);
+  const runner = new ReminderRunner(s, (_j, t) => { fired.push(t); }, logger);
   s.add({ title: "错过的事", at: inSec(-3600), channel: "tui" }); // 1 小时前
-  runner.check();
+  await runner.check();
   assert.match(fired[0], /错过补发/);
   const runs = readFileSync(runsFile, "utf8").trim().split("\n");
   assert.ok(runs.some((l) => l.includes("missed")));
 });
 
-test("通知失败不标记完成（下轮重试）", () => {
+test("通知失败不标记完成（下轮重试）", async () => {
   const s = new JobStore(jobsFile, runsFile);
   let shouldThrow = true;
   const runner = new ReminderRunner(s, (_j, _t) => {
     if (shouldThrow) throw new Error("通道故障");
   }, logger);
   const j = s.add({ title: "重试的任务", at: inSec(-1), channel: "tui" });
-  assert.equal(runner.check().length, 0);
+  assert.equal((await runner.check()).length, 0);
   assert.equal(s.byId(j.id)!.status, "pending", "失败后保持待触发");
   shouldThrow = false;
-  assert.equal(runner.check().length, 1, "下轮重试成功");
+  assert.equal((await runner.check()).length, 1, "下轮重试成功");
+});
+
+test("异步推送失败保持待触发，成功后才完成并记录流水", async () => {
+  const s = new JobStore(join(dir, "async.json"), join(dir, "async-runs.jsonl"));
+  const j = s.add({ title: "异步提醒", at: inSec(-1), channel: "wechat" });
+  let fail = true;
+  const runner = new ReminderRunner(s, async () => {
+    await new Promise((r) => setTimeout(r, 10));
+    if (fail) throw new Error("微信网络故障");
+  }, logger);
+  assert.equal((await runner.check()).length, 0);
+  assert.equal(s.byId(j.id)!.status, "pending");
+  assert.equal(existsSync(join(dir, "async-runs.jsonl")), false);
+  fail = false;
+  assert.equal((await runner.check()).length, 1);
+  assert.equal(s.byId(j.id)!.status, "done");
+  assert.equal(readFileSync(join(dir, "async-runs.jsonl"), "utf8").trim().split("\n").length, 1);
+});
+
+test("慢推送未结束时仍待触发，重叠检查不重复发，停止会等待收尾", async () => {
+  const s = new JobStore(join(dir, "slow.json"), join(dir, "slow-runs.jsonl"));
+  const j = s.add({ title: "慢推送", at: inSec(-1), channel: "wechat" });
+  let finish!: () => void;
+  const delivery = new Promise<void>((r) => { finish = r; });
+  let sends = 0;
+  const runner = new ReminderRunner(s, async () => { sends++; await delivery; }, logger);
+  const first = runner.check();
+  const second = runner.check();
+  assert.equal(sends, 1);
+  assert.equal(s.byId(j.id)!.status, "pending");
+  assert.equal(existsSync(join(dir, "slow-runs.jsonl")), false);
+  let stopped = false;
+  const stop = runner.stop().then(() => { stopped = true; });
+  await Promise.resolve();
+  assert.equal(stopped, false);
+  finish();
+  await Promise.all([first, second, stop]);
+  assert.equal(s.byId(j.id)!.status, "done");
+  assert.equal(sends, 1);
 });
 
 test("取消任务", () => {

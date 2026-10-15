@@ -87,7 +87,7 @@ export default function (pi: ExtensionAPI) {
   //    L3 不可用时用空检索替身降级（画像与 L2 照常工作）
   pi.on("before_agent_start", async (event) => {
     try {
-      const pack = buildContextPack(event.prompt, { l1, l2, l3: l3 ?? NO_L3 });
+      const pack = buildContextPack(event.messageType === "user" ? event.prompt : "", { l1, l2, l3: l3 ?? NO_L3 });
       return { systemPrompt: event.systemPrompt + YIA_MEMORY_PROMPT + pack };
     } catch (e) {
       logger.error("ContextPack 构建失败，本轮跳过注入", { error: String(e) });

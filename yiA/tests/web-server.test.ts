@@ -45,6 +45,26 @@ test("DELETE /api/memory/:id 删除并清反向引用", async () => {
   assert.equal(s2, 404);
 });
 
+test("记忆编辑：旧网页返回 409，最新版本可保存，缺少版本被拒绝", async () => {
+  const id = "20260914120100-bbbb2";
+  const { body: original } = await j("/api/memory");
+  const version = original.entries.find((e: any) => e.id === id).version;
+  assert.ok(version);
+  const update = (patch: object) => j(`/api/memory/${id}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(patch),
+  });
+  const first = await update({ content: "微信刚更新的正文", expectedVersion: version });
+  assert.equal(first.status, 200);
+  const stale = await update({ title: "旧网页标题", content: "内容二", expectedVersion: version });
+  assert.equal(stale.status, 409);
+  assert.match(stale.body.error, /已被.*修改/);
+  assert.equal((await update({ content: "没有版本的旧客户端" })).status, 400);
+  const { body: fresh } = await j("/api/memory");
+  const entry = fresh.entries.find((e: any) => e.id === id);
+  assert.equal(entry.content, "微信刚更新的正文");
+  assert.equal((await update({ title: "最新网页标题", expectedVersion: entry.version })).status, 200);
+});
+
 test("POST /api/reminders 校验过去时间拒绝", async () => {
   const { status } = await j("/api/reminders", {
     method: "POST", headers: { "content-type": "application/json" },

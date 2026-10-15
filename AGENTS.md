@@ -13,7 +13,7 @@
 - ✅ **L1 用户画像**：身份/偏好/常驻项目/事实，JSON 分区，会话自动注入
 - ✅ **L2 知识库**：一句话存储→Markdown 条目+frontmatter、自动打标签、自动双向关联
 - ✅ **L2 检索**：BM25 + 分词（中文友好），召回带条目 id 引用；万条冷 <400ms / 热 P95 <17ms
-- ✅ **L2 精炼**：按 id 修改内容/标题/标签（refine，id 与创建时间不变）
+- ✅ **L2 精炼**：按 id 修改内容/标题/标签（refine，id 与创建时间不变）；跨进程写锁+写前重读+原子替换，防止旧缓存覆盖；常驻检索自动刷新，Web 过期编辑返回 409 并保留输入
 - ✅ **L3 会话索引**：SQLite FTS5 全文检索全部会话原文，压缩不丢档
 - ✅ **ContextPack**：每轮自动注入 当前时间+画像+相关记忆+待办提醒
 - ○ 向量检索升级位（PRD F1.3 预留）
@@ -23,7 +23,7 @@
 - ✅ 重复提醒（repeatDays：每天/每 N 天）
 - ✅ 列表 / 按任务 id 取消
 - ✅ 常驻调度守护（30s 周期、jobs.json 持久化、重启不丢、错过补发）
-- ✅ 微信推送（到点推到用户微信，channel 按来源默认）
+- ✅ 微信推送（到点推到用户微信，channel 按来源默认）；等待发送成功后才完成任务，失败/缺配置/停用保留待触发重试；慢推送防重叠，退出等待收尾，每次发送重读配置
 
 ### 微信通道
 - ✅ 私聊全功能：存/取/提醒一条龙（chat-cli 无头会话，`runtime/chats/<id>.jsonl` 连续）
@@ -55,7 +55,7 @@
 - ○ Web 常驻服务化（现为手动 npm run web）
 
 ### 工程化
-- ✅ 单元测试 45 条（node:test 零依赖，含天气 MCP 初始化/工具发现契约）、loadcheck 扩展自检、bench 基准
+- ✅ 单元测试 54 条（node:test 零依赖，含天气 MCP、真实 HTTP 推送失败重试、独立进程并发修改、Web/模型工具过期编辑拦截）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT，仓库 github.com/FUCKTOKL/yiA-Agent，**当前 PRIVATE 待转公开**）；双平台 provision 一键部署
@@ -71,6 +71,8 @@
 | 目录 | 代码全在 `yiA/`；数据 `runtime/`（gitignored 可整体备份）；加载器 `.pi/extensions/`；文档 `docs/` |
 | 运行时独立 | agentDir=`runtime/agent/`（settings/auth/models-store/sessions），与个人 `~/.pi/agent` 零共享；`PI_CODING_AGENT_DIR` 隔离。切模型须同时改此处 `settings.json` 的 defaultProvider/defaultModel，不认个人 Pi 设置；无头会话显式使用当前默认模型，旧微信会话不再绑定旧模型 |
 | 记忆三层 | L1 画像(JSON) / L2 知识库(MD+BM25) / L3 会话(FTS5)，阈值门控召回 |
+| L2 多通道写入 | `runtime/l2/write-lock.db` 仅用作 SQLite 跨进程写锁；条目仍为 Markdown，临时文件原子替换；`runtime/l2/revision` 更新标记不依赖时间精度；网页保存和模型 refine 必须带 expectedVersion（模型从 recall 获取），过期网页返回 409 |
+| 提醒完成语义 | runner 等待异步推送成功，失败保持 pending；同一实例检查不重叠，停止等待当前推送。发送成功后落盘前若崩溃仍可能重发，优先不漏发，不承诺严格恰好一次 |
 | 提醒触发 | **唯一触发者=yia-scheduler 常驻守护**（Linux systemd / Windows 启动文件夹），TUI/chat-cli 不跑 runner 防双发 |
 | 微信架构 | OpenClaw Gateway(2026.8.2 锁定) + @tencent-weixin 插件 + yia-cli CLI 后端（stdin 进消息/stdout JSON） |
 | 网关控制 | 统一 `openclaw gateway start/stop/restart`（自带 systemd/launchd/schtasks 适配），不直接调 systemctl |
@@ -93,7 +95,7 @@
 
 ## 5. 工程约束（提交前检查）
 
-- 提交前（`yiA/` 目录）：`npm test`（45 用例）+ `npm run loadcheck` 必过
+- 提交前（`yiA/` 目录）：`npm test`（54 用例）+ `npm run loadcheck` 必过
 - 单测 node:test 不引第三方；每个 IO 边界有破坏性用例
 - 日志统一走 `yiA/src/logger.ts`（禁记记忆正文/凭据/会话原文；禁散落 console.log）
 - 工具 execute 必返回错误文本；工厂初始化不得抛出拖垮 pi；禁空 catch
@@ -107,7 +109,9 @@
 |---|---|---|
 | 换绑后旧号仍可用 | 插件无 CLI logout，凭据残留 | 移除 accounts/<id>.* 文件+重启网关 |
 | 换绑后新号收不到提醒 | 发送未带 accountId / 配置写进僵尸账号 / targetPeer 填了昵称 | sender 带 accountId；解析只认 configured；强校验 `/^o[\w-]{15,}@im\.wechat$/` |
-| 提醒不响但列表里有 | daemon 内存里是旧配置（开机早于改配置） | `systemctl --user restart yia-scheduler`；网关重试队列会补发 |
+| 提醒不响但列表里有 | 通道暂不可用/推送失败；旧版 daemon 也会驻留旧配置 | 新版每次发送重读配置，失败保持 pending 后续重试；升级后需重启 yia-scheduler |
+| 提醒未收到却显示完成 | 旧版 daemon 吞掉异步推送错误，runner 未等待发送 | 已改 await 发送成功才记流水/完成；旧 done 任务不能自动判断是否漏发，不擅自重发 |
+| 网页保存覆盖微信新记忆 | 旧内存索引/旧编辑页整篇回写 | L2 写锁+最新内容合并；Web expectedVersion 冲突返回 409，刷新后重新打开，编辑框不自动清空 |
 | 日志查不到当天 | 文件名曾用 UTC 日期 | 已改本地时区（2026-09-14） |
 | CLI 后端 harness 报错 | openclaw 8.1 agentRuntime pin 触发绑定检查 | 模型只用纯 ref，勿加 agentRuntime.id |
 | fd/rg 下载超时 | Clash TUN fake-IP DNS | 从个人 pi bin/ 拷静态二进制 |

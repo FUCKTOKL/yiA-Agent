@@ -27,7 +27,7 @@ export function registerMemoryTools(pi: ExtensionAPI, deps: ToolDeps): void {
   const { l1, l2, logger } = deps;
   const fail = (e: unknown) => {
     logger.error("工具执行失败", { error: String(e) });
-    return { content: [{ type: "text", text: `工具执行出错：${String(e)}` }], details: {}, isError: true };
+    return { content: [{ type: "text" as const, text: `工具执行出错：${String(e)}` }], details: {}, isError: true };
   };
 
   // ---- 存（自动关联） ----
@@ -76,7 +76,7 @@ export function registerMemoryTools(pi: ExtensionAPI, deps: ToolDeps): void {
           .map(
             (e) =>
               `## [${e.id}] ${e.title}${e.tags.length ? ` (${e.tags.join(", ")})` : ""}\n` +
-              `创建: ${e.created}` +
+              `版本: ${e.version}\n创建: ${e.created}` +
               (e.links.length ? `｜关联: ${e.links.join(", ")}` : "") +
               `\n${e.content}`
           )
@@ -92,9 +92,10 @@ export function registerMemoryTools(pi: ExtensionAPI, deps: ToolDeps): void {
   pi.registerTool({
     name: "refine",
     label: "精炼",
-    description: "修改一条既有记忆的内容/标题/标签（保留 id 与创建时间）。先 recall 拿到 id 再调用。",
+    description: "修改既有记忆的内容/标题/标签（保留 id 与创建时间）。先 recall 获取 id 与版本，将版本传入 expectedVersion；若提示已被修改，请重新 recall，不要直接用旧内容重试。",
     parameters: Type.Object({
       id: Type.String({ description: "要修改的记忆条目 id" }),
+      expectedVersion: Type.String({ description: "recall 返回的该条记忆版本，用于拒绝过期修改" }),
       content: Type.Optional(Type.String({ description: "新内容（不传则保持原内容）" })),
       title: Type.Optional(Type.String({ description: "新标题（不传则保持原标题）" })),
       tags: Type.Optional(Type.Array(Type.String(), { description: "新标签（不传则保持原标签）" })),

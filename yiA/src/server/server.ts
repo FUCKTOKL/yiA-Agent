@@ -28,7 +28,7 @@ import { extname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import net from "node:net";
 
-import { L2Store } from "../memory/l2/store.ts";
+import { L2Store, MemoryConflictError } from "../memory/l2/store.ts";
 import { JobStore } from "../scheduler/job-store.ts";
 import { L1Store } from "../memory/l1/profile.ts";
 import { loadWechatConfig, type WechatConfig } from "../channels/wechat-config.ts";
@@ -164,6 +164,7 @@ export function createYiaServer(deps: YiaServerDeps): Server {
           }
           if (req.method === "POST") {
             const patch = await body(req);
+            if (typeof patch?.expectedVersion !== "string") return json(res, 400, { error: "请刷新页面，重新打开记忆后再保存。" });
             const e = l2.refine(m[1], patch);
             return e ? json(res, 200, { entry: e }) : json(res, 404, { error: `条目不存在：${m[1]}` });
           }
@@ -451,7 +452,7 @@ export function createYiaServer(deps: YiaServerDeps): Server {
       createReadStream(file).pipe(res);
     } catch (e) {
       logger.error("web 请求处理失败", { path, error: String(e).slice(0, 300) });
-      if (!res.headersSent) json(res, 500, { error: String(e).slice(0, 500) });
+      if (!res.headersSent) json(res, e instanceof MemoryConflictError ? 409 : 500, { error: String(e).slice(0, 500) });
       else res.end();
     }
   });

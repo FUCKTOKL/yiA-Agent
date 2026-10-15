@@ -12,7 +12,7 @@
  *   /brain     知识库浏览器（.md 列表 → 选择 → 打开）
  *   /wechat    微信绑定（状态/换绑/推送目标，全程在 yiA 内完成）
  */
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSelectListTheme, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -126,7 +126,7 @@ export function registerYiaCommands(pi: ExtensionAPI, deps: CommandDeps): void {
 
 /** 用 ScrollView + Markdown 全屏打开一个 md 文件，ESC 关闭 */
 async function showMarkdown(
-  ctx: { ui: { custom: <T>(factory: any, opts?: any) => Promise<T> } } & Record<string, any>,
+  ctx: ExtensionContext,
   file: string,
 ): Promise<void> {
   let content: string;
@@ -136,7 +136,7 @@ async function showMarkdown(
     ctx.ui.notify(`文件读取失败：${String(e).slice(0, 100)}`, "error");
     return;
   }
-  await ctx.ui.custom<null>((tui: any, theme: any, _kb: any, done: () => void) => {
+  await ctx.ui.custom<null>((tui, theme, _kb, done) => {
     const md = new Markdown(content, 1, 1, getMarkdownTheme());
     const scroll = new ScrollView(md, { scrollbar: "always", primary: true });
     const header = new Text(
@@ -178,7 +178,7 @@ import { runCapture, parseWeixinAccounts, gatewayCtl, logoutAllWeixinAccounts, b
 /** 在全屏面板里跑长命令：实时流式显示输出（含二维码），ESC 中止；
  *  检测到验证码提示时行内输入，Enter 提交到子进程 stdin。返回退出码。 */
 function runStream(
-  ctx: any,
+  ctx: ExtensionContext,
   title: string,
   cmd: string,
   args: string[],
@@ -272,7 +272,13 @@ async function editTargetPeer(ctx: any, root: string): Promise<void> {
     ctx.ui.notify("尚未部署微信侧车，请先跑 bash yiA/scripts/provision.sh", "warning");
     return;
   }
-  const cfg = JSON.parse(readFileSync(file, "utf8"));
+  let cfg;
+  try {
+    cfg = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    ctx.ui.notify("微信配置无法读取，请先修复配置文件。", "error");
+    return;
+  }
   const input = await ctx.ui.input("新的推送目标（微信 id，形如 oXXXX...@im.wechat）：", cfg.targetPeer);
   // 真实 peer id 是长不透明串（o+20位左右）；填昵称会静默推送失败
   //（ret=-3 invalid arguments —— 2026-09-14 E2E 体检事故：填了昵称“瓜皮”）

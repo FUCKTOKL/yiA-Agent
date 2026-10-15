@@ -18,12 +18,12 @@ const stubEl = () =>
     { style: {}, classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } }, dataset: {} },
     {
       get(t, k) {
-        if (k in t) return t[k];
-        if (k === "addEventListener" || k === "insertAdjacentHTML" || k === "scrollIntoView" || k === "focus" || k === "click") return () => {};
+        if (k in t) return Reflect.get(t, k);
+        if (["addEventListener", "insertAdjacentHTML", "scrollIntoView", "focus", "click", "append", "replaceChildren", "setAttribute"].includes(String(k))) return () => {};
         if (k === "querySelector" || k === "querySelectorAll" || k === "closest") return () => (k === "querySelectorAll" ? [] : stubEl());
         if (k === "getBoundingClientRect") return () => ({ left: 0, top: 0, width: 100, height: 100 });
         if (k === "value" || k === "textContent" || k === "innerHTML") return "";
-        return t[k];
+        return Reflect.get(t, k);
       },
       set() { return true; },
     },
@@ -32,7 +32,7 @@ const stubEl = () =>
 /** 抓取 html 里全部 id + data-*，模拟 querySelector 精确命中检测 */
 const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
 const doc = {
-  querySelector(sel) {
+  querySelector(sel: string) {
     const m = sel.match(/^#([a-zA-Z][\w-]*)$/); // 只精检纯 id 选择器
     if (m && !ids.has(m[1])) throw new Error(`模块顶层引用了不存在的 id：${sel}`);
     return stubEl();
@@ -40,13 +40,14 @@ const doc = {
   querySelectorAll: () => [],
   addEventListener: () => {},
   createElement: () => stubEl(),
+  createElementNS: () => stubEl(),
   body: stubEl(),
 };
-globalThis.document = doc;
-globalThis.window = { addEventListener: () => {}, location: { reload() {} } };
-globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-globalThis.fetch = async () => ({ ok: true, json: async () => ({ entries: [], msgs: [], pending: [], done: [], enabled: false }), body: null });
-globalThis.requestAnimationFrame = () => {};
+globalThis.document = doc as unknown as Document;
+globalThis.window = { addEventListener: () => {}, location: { reload() {} } } as unknown as Window & typeof globalThis;
+globalThis.localStorage = { getItem: () => null, setItem: () => {} } as unknown as Storage;
+globalThis.fetch = async () => new Response(JSON.stringify({ entries: [], msgs: [], pending: [], done: [], enabled: false }));
+globalThis.requestAnimationFrame = () => 0;
 
 test("index.html 覆盖全部 js 顶层引用的 id（防断链复发）", () => {
   for (const f of ["app.js", "chat.js", "memory.js", "reminders.js", "wechat.js", "status.js"]) {
