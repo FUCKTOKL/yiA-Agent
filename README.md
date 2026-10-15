@@ -63,15 +63,19 @@ yiA   # TUI；或 node yiA/scripts/chat-cli.ts < 无头自检
 只列出已接入服务商的模型；没有可选项时，在 `yiA` 终端运行 `/login` 接入后，点「重新读取」。
 回复进行中会提示稍后切换，避免中断当前回复。
 
+注意：列表说明 Pi 认识这个型号、服务商已接入，不代表您的账号一定有使用权限。
+例如 ChatGPT 登录返回 “model is not supported” 时，需要选择账号支持的型号或重新配置接入；
+不能通过反复重发解决。网页会显示具体错误，历史里的失败回复也可以回看，不再显示空白。
+
 yiA 与个人 Pi 的模型设置完全隔离。微信、Web 和 `yiA` 命令只读取仓库根的
 `runtime/agent/settings.json`；仅在 `~/.pi/agent/` 或个人 Pi TUI 里切换模型，不会影响微信。
 
-也可手工配置：跨供应商时必须同时改 `defaultProvider` 与 `defaultModel`。例如已接入 OpenAI Codex 时，把
-`runtime/agent/settings.json` 中的两个字段改为：
+也可手工配置：跨供应商时必须同时改 `defaultProvider` 与 `defaultModel`。下面仅为字段示例：
+只有已通过 OpenAI API 接入 `openai`、且账号确有 `gpt-5.5` 权限时，才使用这组值；它不适用于仅有 ChatGPT 登录的账号。
 
 ```json
 {
-  "defaultProvider": "openai-codex",
+  "defaultProvider": "openai",
   "defaultModel": "gpt-5.5"
 }
 ```

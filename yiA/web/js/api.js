@@ -30,20 +30,31 @@ function ssePost(path, body, onsse) {
           if (done) break;
           buf += dec.decode(value, { stream: true });
           // 解析 SSE 帧：空行分隔，event:/data: 两行
-          const frames = buf.split("\n\n"); buf = frames.pop() ?? "";
+          const frames = buf.split(/\r?\n\r?\n/); buf = frames.pop() ?? "";
           for (const f of frames) {
             const ev = (f.match(/^event: (.+)$/m) ?? [])[1];
             const da = (f.match(/^data: (.+)$/m) ?? [])[1];
             if (ev) {
-              const payload = da ? JSON.parse(da) : {};
+              let payload;
+              try {
+                payload = da ? JSON.parse(da) : {};
+              } catch {
+                onsse("error", { error: "回复数据不完整，请重新发送。" });
+                return resolve(null);
+              }
+              if (!payload || typeof payload !== "object") {
+                onsse("error", { error: "回复格式不正确，请重新发送。" });
+                return resolve(null);
+              }
               onsse(ev, payload);
               if (ev === "done" || ev === "error") return resolve(payload); // qr 等中间帧继续收
             }
           }
         }
+        onsse("error", { error: "连接已中断，回复未完成，请重新发送。" });
         resolve(null);
       })
-      .catch((e) => { onsse("error", { error: String(e) }); resolve(null); });
+      .catch((e) => { onsse("error", { error: `连接出现问题：${e.message || String(e)}` }); resolve(null); });
   });
 }
 
@@ -72,7 +83,11 @@ export const api = {
 
   /** SSE 对话：onsse(evt, data) 依次收到 start/done/error */
   chat(text, onsse, session = "web") {
-    return ssePost("/api/chat", { text, session }, onsse);
+    return ssePost("/api/chat", { text, session }, (event, data) => {
+      if (event === "done" && (typeof data.text !== "string" || !data.text.trim())) {
+        onsse("error", { error: "模型没有返回可显示的回复，请重试或更换模型。" });
+      } else onsse(event, data);
+    });
   },
   /** POST + SSE 流（换绑二维码流用） */
   sse(path, body, onsse) {

@@ -14,6 +14,7 @@
  */
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createYiaHeadlessSession, disposeYiaHeadlessSession } from "../src/chat/session-factory.ts";
+import { getAssistantReply, formatReplyError } from "../src/chat/reply.ts";
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
@@ -64,27 +65,17 @@ async function main(): Promise<void> {
   const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(root);
 
   const session = await createYiaHeadlessSession(root, AGENT_DIR, sessionManager);
-
-  await session.prompt(prompt);
-  if (sessionId && !reused && session.sessionFile) {
-    mkdirSync(dirname(file), { recursive: true });
-    copyFileSync(session.sessionFile, file);
+  let result: string;
+  try {
+    await session.prompt(prompt);
+    if (sessionId && !reused && session.sessionFile) {
+      mkdirSync(dirname(file), { recursive: true });
+      copyFileSync(session.sessionFile, file);
+    }
+    result = getAssistantReply(session.agent.state.messages);
+  } finally {
+    await disposeYiaHeadlessSession(session);
   }
-
-  // 取最后一条 assistant 文本作为回复
-  const msgs = session.agent.state.messages;
-  const last = [...msgs].reverse().find((m) => m.role === "assistant");
-  const text = last
-    ? (Array.isArray(last.content) ? last.content : [])
-        .filter((c: any) => c?.type === "text")
-        .map((c: any) => c.text)
-        .join("\n")
-    : "";
-  // Pi 会把上游模型错误写入 assistant.errorMessage，但 prompt() 不抛异常；
-  // 不可返回空串，否则 OpenClaw 只会显示笼统的 yia-cli request fail。
-  const result = text || `（yiA 模型请求失败：${String((last as any)?.errorMessage ?? "未返回内容").slice(0, 300)}）`;
-
-  await disposeYiaHeadlessSession(session);
   console.log(JSON.stringify({ result, session_id: sessionId ?? "default" }));
 }
 
@@ -93,6 +84,6 @@ const entry = process.argv[1] ? resolve(process.argv[1]) : "";
 if (entry && entry === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
     // 兜底：任何异常都返回可发送的文本，绝不让 Gateway 收到空回复静默
-    console.log(JSON.stringify({ result: `（yiA 处理出错：${String(e).slice(0, 200)}）`, session_id: "" }));
+    console.log(JSON.stringify({ result: `（yiA 处理出错：${formatReplyError(e)}）`, session_id: "" }));
   });
 }

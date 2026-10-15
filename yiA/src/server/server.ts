@@ -37,6 +37,7 @@ import { ClawbotSender } from "../channels/clawbot/sender.ts";
 import { runCapture, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPeer, gatewayCtl } from "../channels/weixin-ops.ts";
 import { Logger } from "../logger.ts";
 import { loadModelCatalog, type ModelChoice } from "./model-catalog.ts";
+import { EMPTY_REPLY_MESSAGE, formatReplyError } from "../chat/reply.ts";
 
 export interface YiaServerDeps {
   root: string;
@@ -104,9 +105,9 @@ export function createYiaServer(deps: YiaServerDeps): Server {
   let chatBusy = false;
 
   /** pi 会话 jsonl → 前端格式 [{who,text,t}]（多会话共用） */
-  const historyOf = (sid: string): { who: string; text: string; t: string }[] => {
+  const historyOf = (sid: string): { who: string; text: string; t: string; error?: boolean }[] => {
     const file = join(root, "runtime", "chats", `${sid}.jsonl`);
-    const out: { who: string; text: string; t: string }[] = [];
+    const out: { who: string; text: string; t: string; error?: boolean }[] = [];
     if (!existsSync(file)) return out;
     for (const line of readFileSync(file, "utf8").split("\n")) {
       if (!line.trim()) continue;
@@ -117,7 +118,9 @@ export function createYiaServer(deps: YiaServerDeps): Server {
         if (role !== "user" && role !== "assistant") continue;
         const text = (Array.isArray(d.message.content) ? d.message.content : [])
           .filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-        if (text) out.push({ who: role === "user" ? "user" : "ai", text, t: d.timestamp ?? "" });
+        const failed = role === "assistant" && (d.message.errorMessage || d.message.stopReason === "error" || d.message.stopReason === "aborted");
+        if (failed) out.push({ who: "ai", text: formatReplyError(d.message.errorMessage || (d.message.stopReason === "aborted" ? "这次回复已中断，请重新发送。" : EMPTY_REPLY_MESSAGE)), t: d.timestamp ?? "", error: true });
+        else if (text) out.push({ who: role === "user" ? "user" : "ai", text, t: d.timestamp ?? "" });
       } catch { /* 跳过损坏行 */ }
     }
     return out.slice(-40);
@@ -449,10 +452,10 @@ export function createYiaServer(deps: YiaServerDeps): Server {
             const reply = deps.chat
               ? await deps.chat(text)
               : await (await import("../chat/session.ts")).webChat(text, root, deps.agentDir ?? join(root, "runtime", "agent"), logger, sid);
+            if (typeof reply !== "string" || !reply.trim()) throw new Error(EMPTY_REPLY_MESSAGE);
             sse(res, "done", { text: reply });
           } catch (e) {
-            // 错误原样推给前端（产品理念：不吞错）
-            sse(res, "error", { error: String(e).slice(0, 500) });
+            sse(res, "error", { error: formatReplyError(e) });
           } finally {
             chatBusy = false;
             res.end();

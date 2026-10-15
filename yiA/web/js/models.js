@@ -61,7 +61,7 @@ async function load() {
     providerSelect.disabled = !providers.length;
     loading = false;
     fillModels(info.defaultModel);
-    feedback(providers.length ? "切换后，网页与微信的下一条消息使用所选模型。" : "还没有可选模型。请在 yiA 终端运行 /login 接入服务商，再点「重新读取」。");
+    feedback(providers.length ? "切换后从下一条消息生效。列表中的型号是否可用，以您的账号权限为准。" : "还没有可选模型。请在 yiA 终端运行 /login 接入服务商，再点「重新读取」。");
   } catch (e) {
     if (token !== request) return;
     loading = false;

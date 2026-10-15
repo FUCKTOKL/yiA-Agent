@@ -7,6 +7,7 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createYiaHeadlessSession, disposeYiaHeadlessSession } from "./session-factory.ts";
+import { getAssistantReply } from "./reply.ts";
 import type { Logger } from "../logger.ts";
 
 interface WebSession {
@@ -59,12 +60,7 @@ export async function webChat(text: string, root: string, agentDir: string, logg
           mkdirSync(dirname(file), { recursive: true });
           copyFileSync(session.sessionFile, file);
         }
-        const msgs = session.agent.state.messages;
-        const last = [...msgs].reverse().find((mm) => mm.role === "assistant");
-        return (Array.isArray(last?.content) ? last!.content : [])
-          .filter((c: any) => c?.type === "text")
-          .map((c: any) => c.text)
-          .join("\n");
+        return getAssistantReply(session.agent.state.messages);
       },
       dispose() { return disposeYiaHeadlessSession(session); },
     };

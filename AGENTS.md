@@ -48,6 +48,7 @@
 - ✅ 后端：`src/server/server.ts` 工厂（DI 可测）+ `scripts/web-server.ts` 薄入口；零依赖 HTTP+SSE，仅绑 127.0.0.1
 - ✅ 四页：对话（真实 agent 会话 SSE、ContextPack 折叠条）/ 记忆（列表+力导向图谱+聚焦阅读/编辑/删除）/ 提醒（增删）/ 微信（状态+测试推送）
 - ✅ **会话管理**：全部历史会话列表（首条用户消息命名，剥微信噪声头）、切换/删除/新开，删会话自动卸载内存缓存
+- ✅ **对话失败可见**：Web/微信共用 `src/chat/reply.ts` 检查模型结果；拒绝空回复、错误结果和上一轮旧答案；Web 实时与历史都显示错误，断流/损坏消息会提示并恢复发送按钮；文本通过 DOM 安全渲染
 - ✅ **模型设置**：会话面板右上角打开，与微信换绑共用 `.settings-win` 弹窗；按已接入服务商选择模型，provider/model 成对校验与保存；释放旧 Web 会话缓存，网页/微信下一条消息生效且保留历史；回复进行中禁止切换，不展示密钥
 - ✅ **全页视觉对齐**：共用页面宽度、内边距、标题高度与分隔线；明暗主题、1440/1024/390 宽度截图验证无横向溢出；模型/微信设置同材质同宽，弹窗支持键盘焦点回收
 - ✅ **斜杠命令**：`/login`（模型接入）/`/model`/`/status`/`/reminders`/`/memory`/`/new`/`/help`，命令面板反色浮层，客户端拦截不发给模型
@@ -57,7 +58,7 @@
 - ○ Web 常驻服务化（现为手动 npm run web）
 
 ### 工程化
-- ✅ 单元测试 61 条（node:test 零依赖，含天气 MCP、推送失败重试、跨进程记忆修改、过期编辑拦截、模型清单/切换/并发保护）、loadcheck 扩展自检、bench 基准
+- ✅ 单元测试 74 条（node:test 零依赖，含推送重试、跨进程记忆修改、模型切换与错误结果、历史失败回显、SSE 空回复/断流/损坏消息保护）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT，仓库 github.com/FUCKTOKL/yiA-Agent，**当前 PRIVATE 待转公开**）；双平台 provision 一键部署
@@ -82,7 +83,7 @@
 | 微信凭据 | ~/.openclaw/openclaw-weixin/accounts/ 下按文件存；插件不支持 CLI logout，登出=移除凭据文件（备份到 .removed-backup/） |
 | 天气 MCP | 用 Pi 内置 `pi mcp` 配到独立运行时的全局 `mcp.json`，直连暴露；勿改项目 `.mcp.json`（无头会话会被项目服务器信任机制拦截）。数据源 Open-Meteo，零 key。SDK 无头会话不会自动加载 MCP，必须走 `src/chat/session-factory.ts`（显式 createMcpExtension + bindExtensions + `PI_CODING_AGENT_DIR`） |
 | Web 架构 | `src/server/server.ts` 工厂（createYiaServer，DI 可测）+ `scripts/web-server.ts` 薄入口；曾出现双后端并行事故（无测脚本影子实现），合并后禁止另起炉灶 |
-| Web 模型设置 | `src/server/model-catalog.ts` 复用 Pi ModelRuntime 读取独立运行时，只列已接入服务商；`/api/model` 校验完整 provider/model 并释放旧 Web 缓存后原子保存；旧斜杠命令只给 id 时，仅在唯一匹配时推断服务商 |
+| Web 模型设置 | `src/server/model-catalog.ts` 复用 Pi ModelRuntime 读取独立运行时，只列已接入服务商；目录收录不等于账号有该型号权限；`/api/model` 校验完整 provider/model 并释放旧 Web 缓存后原子保存；旧斜杠命令只给 id 时，仅在唯一匹配时推断服务商 |
 | Web 材质 | Apple 毛玻璃，色底 **.96**：透明材质岛间必有色差（透多少差多少），多轮实测定论，不要回调透明度 |
 | Web 二维码 | 终端 ASCII 码必转 SVG（字符列宽在浏览器不可靠对齐）；剥 ANSI+提取纯█▀▄块再解析模块矩阵 |
 | 验证方式 | 视觉/布局 bug 用 playwright 截图+像素量化定位（headless 软渲染复现不了 GPU 合成 bug，需真浏览器确认） |
@@ -98,7 +99,7 @@
 
 ## 5. 工程约束（提交前检查）
 
-- 提交前（`yiA/` 目录）：`npm test`（61 用例）+ `npm run loadcheck` 必过
+- 提交前（`yiA/` 目录）：`npm test`（74 用例）+ `npm run loadcheck` 必过
 - 单测 node:test 不引第三方；每个 IO 边界有破坏性用例
 - 日志统一走 `yiA/src/logger.ts`（禁记记忆正文/凭据/会话原文；禁散落 console.log）
 - 工具 execute 必返回错误文本；工厂初始化不得抛出拖垮 pi；禁空 catch
@@ -125,7 +126,7 @@
 | 切会话历史叠加 | loadHistory 不清旧 .msg 节点 | 清节点但保留同容器 ctxBar（不能 innerHTML 一刀切） |
 | provision 不可重跑 | 历史游离引号致 bash 语法错 | 已修；bash -n 预检脚本语法 |
 | Web 双后端事故 | 新写 scripts 版影子实现与 src/server 并行（无单测） | 合并回工厂模式；改后端只改 src/server |
-| 微信回 `yia-cli/yia request fail` | Pi 会把上游模型（如 GLM Coding Plan 到期 429）的错误写进 assistant.errorMessage，chat-cli 旧版却只取文本而返回空串 | chat-cli 空文本时返回安全截断的 errorMessage；续订套餐或在 `/login` 换可用模型 |
+| 微信回 `yia-cli/yia request fail` / Web 空白回复 | Pi 将套餐到期、账号拒绝型号等错误写进 assistant.errorMessage，prompt 不一定抛错；只取文本会误发空 done | Web/微信共用 getAssistantReply，失败抛可读错误；Web 发 error 帧且历史可回看；实际账号无权限仍需用户重新接入或选支持的型号 |
 | MCP 加入后微信 CLI 不退出 | `AgentSession.dispose()` 不发 session_shutdown，stdio MCP 子进程仍持有事件循环 | 用 `disposeYiaHeadlessSession()` 显式发 session_shutdown 后再 dispose |
 
 ## 7. 文档索引（docs/）

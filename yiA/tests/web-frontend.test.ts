@@ -19,7 +19,7 @@ const stubEl = () =>
     {
       get(t, k) {
         if (k in t) return Reflect.get(t, k);
-        if (["addEventListener", "insertAdjacentHTML", "scrollIntoView", "focus", "click", "append", "replaceChildren", "setAttribute"].includes(String(k))) return () => {};
+        if (["addEventListener", "insertAdjacentHTML", "scrollIntoView", "focus", "click", "append", "replaceChildren", "setAttribute", "removeAttribute"].includes(String(k))) return () => {};
         if (k === "querySelector" || k === "querySelectorAll" || k === "closest") return () => (k === "querySelectorAll" ? [] : stubEl());
         if (k === "getBoundingClientRect") return () => ({ left: 0, top: 0, width: 100, height: 100 });
         if (k === "value" || k === "textContent" || k === "innerHTML") return "";
@@ -40,6 +40,7 @@ const doc = {
   querySelectorAll: () => [],
   addEventListener: () => {},
   createElement: () => stubEl(),
+  createTextNode: (text: string) => ({ textContent: text }),
   createElementNS: () => stubEl(),
   body: stubEl(),
 };
@@ -49,7 +50,7 @@ globalThis.Option = function (text = "", value = "") {
 globalThis.document = doc as unknown as Document;
 globalThis.window = { addEventListener: () => {}, location: { reload() {} } } as unknown as Window & typeof globalThis;
 globalThis.localStorage = { getItem: () => null, setItem: () => {} } as unknown as Storage;
-globalThis.fetch = async () => new Response(JSON.stringify({ entries: [], msgs: [], pending: [], done: [], enabled: false, models: [], auth: {} }));
+globalThis.fetch = async () => new Response(JSON.stringify({ entries: [], msgs: [], pending: [], done: [], enabled: false, models: [], auth: {}, sessions: [] }));
 globalThis.requestAnimationFrame = () => 0;
 
 test("index.html 覆盖全部 js 顶层引用的 id（防断链复发）", () => {

@@ -1,136 +1,158 @@
-/** 对话页：真实会话（SSE）+ ContextPack 折叠条 + 历史岛（runtime/chats/ 各通道） */
-import { $, $$, esc, api } from "./api.js";
+/** 对话页：回复与失败状态都明确显示，历史和实时消息使用相同的安全文本渲染。 */
+import { $, $$, api } from "./api.js";
 import { openFocus } from "./memory.js";
 
 const chatScroll = $("#chatScroll"), chatInput = $("#chatInput"), sendBtn = $("#sendBtn");
-const ID_RE = /\b(\d{8}\d{6}-[a-z0-9]{4,8})\b/g; // 条目 id 形如 20260914135201-k7x9mf
-
-let memIndex = []; // id→{title,sum} 缓存，供引用芯片悬浮
+const ID_RE = /\b(\d{14}-[a-z0-9]{4,8})\b/g;
+let memIndex = [];
 api.memory().then((d) => { memIndex = d.entries; }).catch(() => {});
-
-/** 当前会话：右岛可切换/新建，发送与历史都跟随 */
-let activeSession = "web";
-const fmtTs = (iso) => { try { return new Date(iso).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); } catch { return ""; } };
-
+let activeSession = "web", busy = false;
 const now = () => new Date().toTimeString().slice(0, 5);
-const linkIds = (html) =>
-  html.replace(ID_RE, (id) => `<span class="hl" data-id="${id}">${id}</span>`);
+const fmtTs = (iso) => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+};
+const node = (tag, className, text) => {
+  const el = document.createElement(tag);
+  el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+};
 
-function appendMsg(who, html, t = now()) {
-  if (who === "user") {
-    chatScroll.insertAdjacentHTML("beforeend", `<div class="msg user"><div class="who">我 · ${t}</div><div class="bubble">${esc(html)}</div></div>`);
-  } else {
-    chatScroll.insertAdjacentHTML("beforeend", `<div class="msg ai"><div class="who">yiA · ${t}</div><div class="body">${linkIds(html)}</div></div>`);
+function renderBody(body, text, error = false) {
+  body.replaceChildren();
+  body.classList.remove("is-thinking");
+  body.classList.toggle("reply-error", error);
+  if (error) body.setAttribute("role", "alert");
+  else body.removeAttribute("role");
+  const value = String(text ?? "");
+  let offset = 0;
+  for (const match of value.matchAll(ID_RE)) {
+    body.append(document.createTextNode(value.slice(offset, match.index)));
+    const ref = node("span", "hl", match[0]);
+    ref.dataset.id = match[0];
+    body.append(ref);
+    offset = match.index + match[0].length;
   }
+  body.append(document.createTextNode(value.slice(offset)));
+}
+
+function appendMsg(who, text, t = now(), error = false) {
+  const message = node("div", `msg ${who === "user" ? "user" : "ai"}`);
+  const body = node("div", who === "user" ? "bubble" : "body");
+  message.append(node("div", "who", `${who === "user" ? "我" : "yiA"} · ${t}`), body);
+  renderBody(body, text, error);
+  chatScroll.append(message);
   chatScroll.scrollTop = chatScroll.scrollHeight;
+  return body;
 }
 
 async function loadHistory() {
   const { msgs } = await api.chatHistory(activeSession);
-  // 清旧消息（保留 ctxBar），一次只显示当前会话的历史
   $$("#chatScroll .msg").forEach((el) => el.remove());
-  if (msgs.length) {
-    $("#chatEmpty").hidden = true; chatScroll.style.display = "";
-    for (const m of msgs.slice(-20)) appendMsg(m.who === "user" ? "user" : "ai", m.who === "user" ? esc(m.text) : m.text, m.t ? fmtTs(m.t) : undefined);
-  } else {
-    $("#chatEmpty").hidden = false; chatScroll.style.display = "none";
-  }
+  $("#chatEmpty").hidden = !!msgs.length;
+  chatScroll.style.display = msgs.length ? "" : "none";
+  for (const m of msgs.slice(-20)) appendMsg(m.who, m.text, m.t ? fmtTs(m.t) : undefined, m.error === true);
 }
 
 async function loadCtx() {
   const c = await api.context();
-  const secs = [
+  const sections = [
     ["当前时间", c.now],
     ["用户画像", Object.values(c.profile ?? {}).flat().join("；").slice(0, 80) || "（空）"],
-    ["相关记忆", c.recent.map((r) => r.id).join(" · ") || "（无）"],
-    ["待办提醒", c.reminders.map((r) => `${r.at.slice(5, 16)} ${r.title}（${r.channel}）`).join(" · ") || "（无）"],
+    ["相关记忆", (c.recent ?? []).map((r) => r.id).join(" · ") || "（无）"],
+    ["待办提醒", (c.reminders ?? []).map((r) => `${r.at.slice(5, 16)} ${r.title}（${r.channel}）`).join(" · ") || "（无）"],
   ];
-  $("#ctxGrid").innerHTML = secs.map(([k, v]) => `<div><b>${k}</b>　${esc(v)}</div>`).join("");
-  $("#ctxBar .t").textContent = `ContextPack 已注入 · ${secs.length} sections`;
+  $("#ctxGrid").replaceChildren(...sections.map(([key, value]) => {
+    const row = node("div", "");
+    row.append(node("b", "", key), document.createTextNode(`　${value ?? ""}`));
+    return row;
+  }));
+  $("#ctxBar .t").textContent = `ContextPack 已注入 · ${sections.length} 项`;
 }
 
-let busy = false;
 async function send() {
-  const v = chatInput.value.trim();
-  if (!v || busy) return;
-  // 斜杠命令兜底：面板被关（如点外）时手敲完整命令也能执行，绝不发给模型
-  if (v.startsWith("/")) {
-    busy = true;
-    chatInput.value = "";
-    hideCmd();
-    sysMsg(`$ ${v}`);
-    const [cmd, ...rest] = v.split(/\s+/);
-    const c = COMMANDS.find((x) => x.cmd === cmd);
-    try { await Promise.resolve(c ? c.run(rest.join(" ")) : sysMsg(`未知命令 ${cmd}，/help 看清单`)); }
-    catch (e) { sysMsg("出错：" + e.message); }
-    busy = false; sendBtn.disabled = false; chatInput.focus();
-    return;
-  }
+  const text = chatInput.value.trim();
+  if (!text || busy) return;
   busy = true; sendBtn.disabled = true;
-  $("#chatEmpty").hidden = true; chatScroll.style.display = "";
-  appendMsg("user", v);
-  chatInput.value = "";
-  appendMsg("ai", '<span style="opacity:.55">思考中…</span>');
-  const think = chatScroll.lastElementChild;
-  await api.chat(v, (evt, data) => {
-    if (evt === "done") { think.querySelector(".body").innerHTML = linkIds(esc(data.text)); loadSessions(); }
-    if (evt === "error") { think.querySelector(".body").innerHTML = `<span style="color:#E26252">${esc(data.error)}</span>`; }
-    chatScroll.scrollTop = chatScroll.scrollHeight;
-  }, activeSession);
-  busy = false; sendBtn.disabled = false; chatInput.focus();
+  try {
+    if (text.startsWith("/")) {
+      chatInput.value = ""; hideCmd(); sysMsg(`$ ${text}`);
+      const [cmd, ...args] = text.split(/\s+/);
+      const command = COMMANDS.find((c) => c.cmd === cmd);
+      await (command ? command.run(args.join(" ")) : sysMsg(`未知命令 ${cmd}，/help 看清单`));
+      return;
+    }
+    $("#chatEmpty").hidden = true;
+    $("#newChatBtn").disabled = true;
+    chatScroll.style.display = "";
+    appendMsg("user", text);
+    chatInput.value = "";
+    const body = appendMsg("ai", "思考中…");
+    body.classList.add("is-thinking");
+    let settled = false;
+    try {
+      await api.chat(text, (event, data) => {
+        if (event === "done" || event === "error") {
+          settled = true;
+          const empty = event === "done" && (typeof data.text !== "string" || !data.text.trim());
+          renderBody(body, event === "error" ? (data.error || "回复失败，请重试。") : empty ? "模型没有返回可显示的回复，请重试或更换模型。" : data.text, event === "error" || empty);
+          void loadSessions();
+        }
+        chatScroll.scrollTop = chatScroll.scrollHeight;
+      }, activeSession);
+      if (!settled) renderBody(body, "连接已中断，回复未完成，请重新发送。", true);
+    } catch (e) {
+      renderBody(body, `回复失败：${e.message}`, true);
+    }
+  } catch (e) {
+    sysMsg(`出错：${e.message}`);
+  } finally {
+    busy = false; sendBtn.disabled = false; $("#newChatBtn").disabled = false; chatInput.focus();
+  }
 }
 
 sendBtn.onclick = send;
-chatInput.addEventListener("keydown", (e) => {
-  // 命令面板键盘导航（面板可见时拦截方向键/Enter/Tab/Esc）
-  if (cmdMenu.style.display !== "none") {
-    const opts = [...$$("#cmdMenu .cmd-row")];
-    let i = opts.findIndex((o) => o.classList.contains("sel"));
-    if (e.key === "ArrowDown") { e.preventDefault(); opts[i]?.classList.remove("sel"); opts[(i + 1) % opts.length].classList.add("sel"); return; }
-    if (e.key === "ArrowUp") { e.preventDefault(); opts[i]?.classList.remove("sel"); opts[(i - 1 + opts.length) % opts.length].classList.add("sel"); return; }
-    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); opts[i]?.click(); return; }
-    if (e.key === "Escape") { hideCmd(); return; }
-  }
-  if (e.key === "Enter") send();
-});
-
-/* ===== 斜杠命令：yiA 功能直达（客户端拦截，不发给模型） ===== */
 const cmdMenu = $("#cmdMenu");
 const COMMANDS = [
   { cmd: "/login", desc: "模型接入（查看/更新 key）", run: () => runLogin() },
   { cmd: "/model", desc: "查看/切换默认模型", arg: "模型id（留空看清单）", run: (a) => runModel(a) },
-  { cmd: "/status", desc: "系统状态", run: async () => sysMsg(JSON.stringify(await api.status(), null, 0)) },
+  { cmd: "/status", desc: "系统状态", run: async () => sysMsg(JSON.stringify(await api.status())) },
   { cmd: "/reminders", desc: "待办提醒清单", run: async () => {
-      const { pending } = await api.reminders();
-      sysMsg(pending.length ? pending.map((r) => `${r.at.slice(5, 16)} ${r.title}（${r.channel === "tui" ? "TUI" : "微信"}）`).join("\n") : "当前没有排期中的提醒");
-    } },
+    const { pending } = await api.reminders();
+    sysMsg(pending.length ? pending.map((r) => `${r.at.slice(5, 16)} ${r.title}（${r.channel === "tui" ? "TUI" : "微信"}）`).join("\n") : "当前没有排期中的提醒");
+  } },
   { cmd: "/memory", desc: "检索知识库", arg: "关键词", run: async (a) => {
-      const { entries } = await api.memory(a || "");
-      sysMsg(entries.length ? entries.slice(0, 8).map((m) => `${m.id} ${m.title}`).join("\n") : "没有匹配的条目");
-    } },
+    const { entries } = await api.memory(a || "");
+    sysMsg(entries.length ? entries.slice(0, 8).map((m) => `${m.id} ${m.title}`).join("\n") : "没有匹配的条目");
+  } },
   { cmd: "/new", desc: "新开一个对话", run: () => $("#newChatBtn").click() },
-  { cmd: "/help", desc: "列出全部命令", run: () => sysMsg(COMMANDS.map((c) => c.cmd + (c.arg ? ` ${c.arg}` : "") + " — " + c.desc).join("\n")) },
+  { cmd: "/help", desc: "列出全部命令", run: () => sysMsg(COMMANDS.map((c) => `${c.cmd}${c.arg ? ` ${c.arg}` : ""} — ${c.desc}`).join("\n")) },
 ];
-const sysMsg = (text) => appendMsg("ai", esc(text).replace(/\n/g, "<br>"));
+const sysMsg = (text) => appendMsg("ai", text);
 const hideCmd = () => { cmdMenu.style.display = "none"; };
 
 function showCmd(filter) {
-  const list = COMMANDS.filter((c) => !filter || c.cmd.startsWith(filter));
-  if (!list.length) { hideCmd(); return; }
-  cmdMenu.innerHTML = list.map((c, i) =>
-    `<div class="cmd-row${i === 0 ? " sel" : ""}" data-cmd="${c.cmd}"><b>${c.cmd}</b>${c.arg ? ` <span class="arg">${c.arg}</span>` : ""}<span>${c.desc}</span></div>`).join("");
+  const commands = COMMANDS.filter((c) => !filter || c.cmd.startsWith(filter));
+  if (!commands.length) { hideCmd(); return; }
+  cmdMenu.replaceChildren(...commands.map((command, index) => {
+    const row = node("div", `cmd-row${index === 0 ? " sel" : ""}`);
+    row.dataset.cmd = command.cmd;
+    row.append(node("b", "", command.cmd));
+    if (command.arg) row.append(node("span", "arg", command.arg));
+    row.append(node("span", "", command.desc));
+    row.onclick = () => execCmd(command.cmd);
+    return row;
+  }));
   cmdMenu.style.display = "block";
-  $$("#cmdMenu .cmd-row").forEach((row) => {
-    row.onclick = () => execCmd(row.dataset.cmd);
-  });
 }
 function execCmd(raw) {
   hideCmd(); chatInput.value = "";
-  const [cmd, ...rest] = raw.trim().split(/\s+/);
-  const c = COMMANDS.find((x) => x.cmd === cmd);
-  if (!c) return;
+  const [cmd, ...args] = raw.trim().split(/\s+/);
+  const command = COMMANDS.find((c) => c.cmd === cmd);
+  if (!command) return;
   sysMsg(`$ ${raw}`);
-  Promise.resolve(c.run(rest.join(" "))).catch((e) => sysMsg("出错：" + e.message));
+  Promise.resolve(command.run(args.join(" "))).catch((e) => sysMsg(`出错：${e.message}`));
 }
 async function runLogin() {
   const info = await api.loginInfo();
@@ -140,87 +162,92 @@ async function runLogin() {
 async function runModel(arg) {
   const info = await api.loginInfo();
   if (!arg) { sysMsg(`可用模型：\n${info.models.map((m) => m.id).join("\n")}\n当前默认：${info.defaultModel || "未设"}\n切换：/model 模型id`); return; }
-  const m = info.models.find((x) => x.id === arg);
-  if (!m) return sysMsg(`没有模型 ${arg}，/model 看清单`);
-  await api.setModel(m.id);
-  sysMsg(`默认模型已切到 ${m.id}，新会话生效`);
+  const model = info.models.find((m) => m.id === arg);
+  if (!model) return sysMsg(`没有模型 ${arg}，/model 看清单`);
+  await api.setModel(model.id);
+  sysMsg(`默认模型已切到 ${model.id}，下一条消息生效`);
 }
 let loginPending = false;
-
+chatInput.addEventListener("keydown", (e) => {
+  if (cmdMenu.style.display !== "none") {
+    const options = $$("#cmdMenu .cmd-row");
+    const i = options.findIndex((o) => o.classList.contains("sel"));
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length) {
+      e.preventDefault(); options[i]?.classList.remove("sel");
+      options[(i + (e.key === "ArrowDown" ? 1 : -1) + options.length) % options.length].classList.add("sel");
+      return;
+    }
+    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); options[i]?.click(); return; }
+    if (e.key === "Escape") { hideCmd(); return; }
+  }
+  if (e.key === "Enter") void send();
+});
 chatInput.addEventListener("input", () => {
-  const v = chatInput.value;
-  // /login 后等待 provider key；但新命令输入（/ 开头）取消等待，回到命令流
-  if (loginPending && v.trim() && !v.startsWith("/")) {
-    const [provider, ...rest] = v.trim().split(/\s+/);
+  const value = chatInput.value;
+  if (loginPending && value.trim() && !value.startsWith("/")) {
+    const [provider, ...rest] = value.trim().split(/\s+/);
     if (rest.length) {
       loginPending = false; chatInput.value = "";
-      api.loginKey(provider, rest.join(" ")).then(() => sysMsg(`已更新 ${provider} 的接入，新会话生效`)).catch((e) => sysMsg("失败：" + e.message));
+      api.loginKey(provider, rest.join(" ")).then(() => sysMsg(`已更新 ${provider} 的接入，新会话生效`)).catch((e) => sysMsg(`失败：${e.message}`));
       return;
     }
   }
-  if (v.startsWith("/") && !v.includes(" ")) showCmd(v);
-  else if (v.startsWith("/")) {
-    const [c, ...rest] = v.trim().split(/\s+/);
-    const match = COMMANDS.find((x) => x.cmd === c);
-    if (match && (rest.length || c !== "/memory" && c !== "/model")) { hideCmd(); return; }
-    showCmd(c);
-  } else hideCmd();
+  if (value.startsWith("/")) showCmd(value.trim().split(/\s+/)[0]);
+  else hideCmd();
+  if (value.startsWith("/") && value.includes(" ")) hideCmd();
 });
 document.addEventListener("click", (e) => { if (!cmdMenu.contains(e.target) && e.target !== chatInput) hideCmd(); });
-$$(".quick").forEach((b) => (b.onclick = () => { chatInput.value = b.textContent; chatInput.focus(); }));
+$$(".quick").forEach((button) => { button.onclick = () => { chatInput.value = button.textContent; chatInput.focus(); }; });
 $("#ctxBar").onclick = () => $("#ctxBar").classList.toggle("open");
-
-/* 引用高亮 id → 打开聚焦阅读层（与记忆页共用） */
 chatScroll.addEventListener("click", (e) => {
-  const h = e.target.closest(".hl");
-  if (h && memIndex.some((m) => m.id === h.dataset.id)) openFocus(h.dataset.id);
+  const ref = e.target.closest(".hl");
+  if (ref && memIndex.some((m) => m.id === ref.dataset.id)) openFocus(ref.dataset.id);
 });
 
-/* 右岛：全部历史会话（首条用户消息命名），点击切换，可新建 */
 async function loadSessions() {
+  const list = $("#histList");
   try {
     const { sessions } = await api.sessions();
-    $("#histList").innerHTML = sessions.map((s) => `
-      <div class="hist-item glass-sub ${s.id === activeSession ? "active" : ""}" data-id="${s.id}">
-        <h4>${esc(s.title)}</h4>
-        <div class="mono">${s.src === "web" ? "Web" : "微信"} · ${s.count} 条 · ${esc(fmtTs(s.lastTs))}</div>
-        <button class="del" title="删除此会话记录">×</button>
-      </div>`).join("") || '<div class="empty-block"><p>还没有会话</p></div>';
-    $$("#histList .hist-item").forEach((el) => {
-      el.onclick = async () => {
-        activeSession = el.dataset.id;
-        $$("#histList .hist-item").forEach((x) => x.classList.toggle("active", x === el));
-        await loadHistory().catch(() => {});
+    list.replaceChildren(...sessions.map((session) => {
+      const row = node("div", `hist-item glass-sub${session.id === activeSession ? " active" : ""}`);
+      row.dataset.id = session.id;
+      const title = node("h4", "", session.title);
+      const meta = node("div", "mono", `${session.src === "web" ? "Web" : "微信"} · ${session.count} 条 · ${fmtTs(session.lastTs)}`);
+      const del = node("button", "del", "×");
+      del.title = "删除此会话记录";
+      row.append(title, meta, del);
+      row.onclick = async () => {
+        if (busy) return;
+        activeSession = session.id;
+        $$("#histList .hist-item").forEach((el) => el.classList.toggle("active", el === row));
+        try { await loadHistory(); } catch (e) { sysMsg(`读取会话失败：${e.message}`); }
       };
-      el.querySelector(".del").onclick = async (e) => {
+      del.onclick = async (e) => {
         e.stopPropagation();
-        const id = el.dataset.id;
-        if (!confirm(`删除会话「${el.querySelector("h4").textContent}」的全部本地记录？此操作不可恢复。`)) return;
+        if (busy || !confirm(`删除会话「${session.title}」的全部本地记录？此操作不可恢复。`)) return;
         try {
-          await api.deleteSession(id);
-          if (id === activeSession) {
-            activeSession = "web";
-            $$("#chatScroll .msg").forEach((x) => x.remove());
-            await loadHistory().catch(() => {});
-          }
-          loadSessions();
-        } catch (err) { alert("删除失败：" + err.message); }
+          await api.deleteSession(session.id);
+          if (session.id === activeSession) { activeSession = "web"; await loadHistory(); }
+          void loadSessions();
+        } catch (err) { sysMsg(`删除失败：${err.message}`); }
       };
-    });
+      return row;
+    }));
+    if (!sessions.length) list.append(node("div", "empty-block", "还没有会话"));
   } catch (e) {
-    $("#histList").innerHTML = `<div class="empty-block"><p>会话列表加载失败：${esc(e.message)}</p></div>`;
+    list.replaceChildren(node("div", "empty-block", `会话列表加载失败：${e.message}`));
   }
 }
 $("#newChatBtn").onclick = () => {
   activeSession = `web-${Date.now().toString(36)}`;
-  chatScroll.innerHTML = "";
+  $$("#chatScroll .msg").forEach((el) => el.remove());
   $("#chatEmpty").hidden = false; chatScroll.style.display = "none";
-  loadSessions();
+  void loadSessions();
 };
 
 export async function initChat() {
   chatInput.disabled = false; sendBtn.disabled = false;
-  loadCtx().catch(() => {});
-  await loadHistory().catch(() => {});
-  loadSessions();
+  void loadCtx().catch(() => {});
+  try { await loadHistory(); } catch (e) { sysMsg(`读取会话失败：${e.message}`); }
+  void loadSessions();
 }
