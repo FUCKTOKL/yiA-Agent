@@ -1,0 +1,16 @@
+/* 模型与微信设置共用 .settings-win；只为模型内容补充布局，不另造材质。 */
+.model-current{margin-top:22px;padding:18px 20px;border-radius:18px;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.field-caption{font-size:12px;color:var(--t3)}
+.model-current strong{font-size:20px;font-weight:600;line-height:1.4;color:var(--t1)}
+.model-detail{font-size:12px;line-height:1.7;color:var(--t3);overflow-wrap:anywhere}
+.model-selection{min-height:20px;margin-top:10px;font-family:var(--mono)}
+.modal-win .form-status{font-size:13px;line-height:1.7;min-height:44px;margin-top:16px;color:var(--t2)}
+.modal-win .form-status.is-error{color:var(--accent)}
+.model-reload{margin-right:auto;padding:10px 0}
+#modelForm .field label{font-family:var(--sans);font-size:13px;color:var(--t2)}
+#modelForm .field select{min-height:46px;padding-right:32px}
+@media(max-width:520px){
+  .model-current strong{font-size:18px}
+  #modelForm .modal-ops{gap:8px}
+  #modelForm .modal-ops .btn-solid,#modelForm .modal-ops .btn-glass{padding:10px 16px}
+}

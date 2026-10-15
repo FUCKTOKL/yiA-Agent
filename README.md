@@ -58,10 +58,15 @@ yiA   # TUI；或 node yiA/scripts/chat-cli.ts < 无头自检
 
 ### 模型切换（微信也使用这一份配置）
 
+推荐在网页操作：打开对话页，点击右侧「会话」面板右上角的模型设置按钮，选择服务商与模型，
+再点「保存设置」。当前网页会话和微信的下一条消息都会使用新模型，聊天记录保留，不必删会话或重启网关。
+只列出已接入服务商的模型；没有可选项时，在 `yiA` 终端运行 `/login` 接入后，点「重新读取」。
+回复进行中会提示稍后切换，避免中断当前回复。
+
 yiA 与个人 Pi 的模型设置完全隔离。微信、Web 和 `yiA` 命令只读取仓库根的
 `runtime/agent/settings.json`；仅在 `~/.pi/agent/` 或个人 Pi TUI 里切换模型，不会影响微信。
 
-跨供应商时必须同时改 `defaultProvider` 与 `defaultModel`。例如已接入 OpenAI Codex 时，把
+也可手工配置：跨供应商时必须同时改 `defaultProvider` 与 `defaultModel`。例如已接入 OpenAI Codex 时，把
 `runtime/agent/settings.json` 中的两个字段改为：
 
 ```json
@@ -74,8 +79,8 @@ yiA 与个人 Pi 的模型设置完全隔离。微信、Web 和 `yiA` 命令只�
 请保留文件中的其他字段。可用模型 id 从 `runtime/agent/models-store.json` 对应 provider 的
 `models` 列表查询。微信下一条消息会读取新设置；它会保留聊天历史，但不会再被旧会话的模型绑定。
 
-Web 的 `/login` 只保存或更新 API key；确认 provider/model 后再按上面的配置切换。当前默认
-模型可在 Web `/login` 的状态文字，或 `runtime/agent/settings.json` 中核对。
+Web 的 `/login` 只保存或更新 API key，不等于已切换模型。当前默认模型可在模型设置窗口、
+会话面板底部或 `runtime/agent/settings.json` 中核对。
 
 ## Web 界面（M6.1）
 
@@ -84,7 +89,8 @@ cd yiA && npm run web     # http://127.0.0.1:3777（仅本机可访问）
 ```
 
 浏览器打开即见：对话（真实 agent 会话，SSE）、知识库（列表/图谱/精炼/删除）、
-提醒（增/删/渠道）、微信状态与测试推送、系统状态浮层。无需再开 TUI。
+提醒（增/删/渠道）、微信状态与测试推送、模型设置、系统状态浮层。四页共用标题基线与间距，
+支持明暗主题和窄屏布局。无需再开 TUI。
 
 ## 常用命令（TUI 内）
 

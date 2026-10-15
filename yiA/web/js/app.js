@@ -1,6 +1,7 @@
 /** 全局壳：导航 / 状态浮层 / 主题切换 / 背景上传 / 弹层通用开闭 */
 import { $, $$ } from "./api.js";
 import { refreshStatus } from "./status.js";
+import { openDialog, closeDialog, handleDialogKey } from "./dialogs.js";
 
 export function initShell() {
   /* 导航切换 */
@@ -47,14 +48,13 @@ export function initShell() {
   fetch("/api/bg").then((r) => { if (r.ok) setBg("/api/bg?t=" + Date.now()); }).catch(() => {});
 
   /* 弹层通用：[data-open] / [data-close] / 点遮罩 / Esc 最上层优先 */
-  $$("[data-open]").forEach((b) => (b.onclick = () => $("#" + b.dataset.open).classList.add("show")));
-  $$("[data-close]").forEach((b) => (b.onclick = () => $("#" + b.dataset.close).classList.remove("show")));
-  $$(".overlay").forEach((ov) => ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.remove("show"); }));
+  $$("[data-open]").forEach((b) => (b.onclick = () => openDialog(b.dataset.open)));
+  $$("[data-close]").forEach((b) => (b.onclick = () => closeDialog($("#" + b.dataset.close))));
+  $$(".overlay").forEach((ov) => ov.addEventListener("click", (e) => { if (e.target === ov) closeDialog(ov); }));
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
     const open = $$(".overlay.show");
-    if (open.length) open[open.length - 1].classList.remove("show");
-    else statusPop.classList.remove("show");
+    if (open.length) handleDialogKey(e, open[open.length - 1]);
+    else if (e.key === "Escape") statusPop.classList.remove("show");
   });
 }
 
@@ -63,9 +63,11 @@ const { initChat } = await import("./chat.js");
 const { initMemory } = await import("./memory.js");
 const { initReminders } = await import("./reminders.js");
 const { initWechat } = await import("./wechat.js");
+const { initModelSettings } = await import("./models.js");
 initShell();
 initChat();
 initMemory();
 initReminders();
 initWechat();
+initModelSettings();
 refreshStatus();

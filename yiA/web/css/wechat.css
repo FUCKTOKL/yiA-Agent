@@ -1,6 +1,6 @@
 /* 页面四：微信 */
-.wx-grid{flex:1;min-height:0;display:grid;grid-template-columns:1.2fr 1fr;gap:24px;padding-top:20px}
-.wx-card{border-radius:24px;padding:22px 26px;display:flex;flex-direction:column;min-height:0}
+.wx-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:var(--page-gap);padding-top:0;overflow-y:auto}
+.wx-card{border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;min-height:0}
 .wx-card h3{font-size:15px;font-weight:600;margin-bottom:6px}
 .kv-row{display:flex;justify-content:space-between;align-items:center;gap:16px;
   padding:14px 0;border-bottom:1px solid var(--hair);font-size:13px}
@@ -26,7 +26,7 @@
 .wx-feedback.show{opacity:1}
 
 /* ===== 换绑向导 ===== */
-.rb-steps{display:flex;gap:6px;margin:14px 0 4px}
+.rb-steps{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 4px}
 .rb-step{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--chip-bg);color:var(--t3)}
 .rb-step.on{background:var(--nav-active);color:var(--t1);font-weight:600}
 .rb-pane{display:none;margin-top:10px}
@@ -40,4 +40,12 @@
 #rbQr{background:#fff;color:#000;font-size:11px;line-height:1.05;
   letter-spacing:0;white-space:pre;width:max-content;min-width:200px;
   max-width:100%;margin:10px auto;padding:14px;overflow:hidden;text-align:center}
-#rbQr svg{margin:0 auto}
+#rbQr svg{margin:0 auto;max-width:100%;height:auto}
+@media(max-width:1000px){.qr-box{width:180px;height:180px}.wx-card{padding:20px}}
+@media(max-width:760px){
+  .wx-grid{grid-template-columns:minmax(0,1fr);align-content:start}
+  .wx-card{min-height:260px}
+  .wx-actions{flex-wrap:wrap;gap:10px}
+  .wx-feedback{width:100%;overflow-wrap:anywhere}
+  .qr-note{font-size:12px;line-height:1.7}
+}

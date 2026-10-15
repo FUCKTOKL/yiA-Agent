@@ -189,6 +189,7 @@ svg.addEventListener("pointerup", () => { drag = null; pan = null; svg.classList
 const fbList = $("#fbList"), graphWrapEl = $("#graphWrap");
 $("#fbToggle").onclick = () => {
   const on = $("#fbToggle").classList.toggle("on");
+  $("#fbToggle").setAttribute("aria-checked", String(on));
   graphWrapEl.style.display = on ? "none" : "";
   fbList.hidden = !on;
   if (on) fbList.replaceChildren(...(memories.length ? memories.map((m) => {

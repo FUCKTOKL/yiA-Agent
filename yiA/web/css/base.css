@@ -104,18 +104,21 @@ body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
 
 /* ===== 舞台与主窗 ===== */
 .stage{position:fixed;inset:64px 64px 64px 184px;z-index:10;display:flex;justify-content:center}
-.page{display:none;width:100%;max-width:1040px;flex-direction:column}
+.page{display:none;width:100%;max-width:var(--page-width);min-width:0;min-height:0;flex-direction:column}
 .page.active{display:flex;animation:win-in .3s var(--ease)}
-.islands-page{max-width:1240px;flex-direction:row;gap:24px}
+.islands-page{flex-direction:row;gap:var(--page-gap)}
 .islands-page.active{display:flex}
 @keyframes win-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 .window{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.win-pad{padding:28px 32px;display:flex;flex-direction:column;flex:1;min-height:0}
-.win-head h1{font-size:28px;font-weight:600}
-.win-head .sub{font-family:var(--mono);font-size:13px;color:var(--t3);margin-top:6px}
-.win-titlebar{display:flex;align-items:flex-start;gap:12px}
-.win-titlebar .spacer{flex:1}
-.hairline{height:1px;background:var(--hair);margin:20px 0 0}
+.win-pad{padding:var(--pad-y) var(--pad-x);display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.win-head{min-width:0}
+.win-head h1{font-size:28px;line-height:1.2;font-weight:600}
+.win-head h2{font-size:18px;line-height:1.3;font-weight:600}
+.win-head .sub{font-size:13px;line-height:20px;color:var(--t3);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-titlebar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-height:var(--header-height);flex:none}
+.win-titlebar > .win-head{flex:1}
+.win-titlebar .spacer{display:none}
+.hairline{height:1px;flex:none;background:var(--hair);margin:20px 0}
 
 /* ===== 按钮 ===== */
 .btn-solid{border:none;cursor:pointer;background:var(--ink);color:#fff;border-radius:999px;
@@ -145,14 +148,25 @@ body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
   -webkit-backdrop-filter:blur(24px) saturate(120%);backdrop-filter:blur(24px) saturate(120%)}
 .overlay.show{display:flex;animation:ov-in .25s var(--ease)}
 @keyframes ov-in{from{opacity:0}to{opacity:1}}
-.modal-win{width:420px;padding:28px 30px;animation:win-in .3s var(--ease)}
+.overlay{padding:24px}
+.modal-win{width:420px;max-width:100%;max-height:calc(100dvh - 48px);overflow-y:auto;padding:28px 30px;animation:win-in .3s var(--ease)}
+.settings-win{width:640px}
+.editor-win{width:560px}
+.modal-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.modal-heading .icon-btn{margin:-8px -8px -8px 0}
 .modal-win h3{font-size:18px;font-weight:600}
 .modal-win p{font-size:14px;color:var(--t2);margin-top:10px;line-height:1.6}
 .modal-ops{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
 .field{margin-top:16px}
 .field label{display:block;font-family:var(--mono);font-size:11.5px;color:var(--t3);margin-bottom:8px}
-.field input{width:100%;border:1px solid var(--input-border);background:var(--input-bg);border-radius:14px;
-  padding:11px 16px;color:var(--t1);font-size:14px;outline:none;font-family:var(--sans)}
+.field input,.field select,.field textarea{width:100%;min-width:0;border:1px solid var(--input-border);background:var(--input-bg);border-radius:14px;
+  padding:11px 16px;color:var(--t1);font-size:14px;line-height:20px;outline:none;font-family:var(--sans)}
+.field select{color-scheme:dark;cursor:pointer}
+body.light .field select{color-scheme:light}
+.field select option{background:rgb(35,32,28);color:var(--t1)}
+body.light .field select option{background:rgb(255,253,249)}
+.field textarea{resize:vertical;min-height:100px;max-height:45dvh}
+.field select:focus,.field textarea:focus{border-color:var(--input-border-focus)}
 .field input::placeholder{color:var(--t3)}
 .field input:focus{border-color:var(--input-border-focus)}
 .seg-row{display:flex;gap:10px}
@@ -161,7 +175,7 @@ body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
 .seg.sel{background:var(--seg-sel);color:var(--t1)}
 
 /* ===== 聚焦阅读窗 ===== */
-.focus-win{width:760px;max-height:82vh;padding:32px 36px;display:flex;flex-direction:column;animation:win-in .3s var(--ease)}
+.focus-win{width:760px;max-width:100%;max-height:calc(100dvh - 48px);padding:28px 30px;display:flex;flex-direction:column;animation:win-in .3s var(--ease)}
 .focus-head{display:flex;align-items:flex-start;gap:14px}
 .focus-head h2{font-size:24px;font-weight:600}
 .focus-head .mid{font-family:var(--mono);font-size:12.5px;color:var(--t3);margin-top:8px}
@@ -177,3 +191,31 @@ body.light .glass .glass-sub, body.light .glass-sub .glass-sub{
 /* 错误态：接入真实后端后使用——错误文本等宽原样展示，不做友好化 */
 .error-card{background:var(--accent-bg);border:1px solid rgba(226,98,82,.45);border-radius:20px;
   padding:14px 18px;font-family:var(--mono);font-size:12.5px;color:var(--accent);line-height:1.7}
+
+/* 控件统一高度、焦点与窄屏边界；不改变已校准的玻璃色底。 */
+.btn-solid,.btn-glass,.btn-red{min-height:42px;line-height:20px;white-space:nowrap;align-items:center;justify-content:center}
+.btn-compact{min-height:32px;padding:5px 12px;font-size:13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,.seg:focus-visible,.field :is(input,select,textarea):focus-visible{outline:2px solid var(--t2);outline-offset:3px}
+button:active:not(:disabled){transform:translateY(1px)}
+@media(max-width:1200px){
+  :root{--pad-y:24px;--pad-x:24px;--page-gap:20px}
+  .stage{inset:40px 32px 40px 128px}
+  .rail{left:24px}
+}
+@media(max-width:760px){
+  :root{--pad-y:22px;--pad-x:22px;--page-gap:16px}
+  .rail{left:16px;right:16px;top:16px;transform:none;width:auto;height:64px;padding:8px;flex-direction:row;gap:6px;border-radius:24px}
+  .brand{margin:0 10px}
+  .stage{inset:96px 16px 16px}
+  .status-pop{left:auto;right:16px;top:90px;bottom:auto}
+  .islands-page{flex-direction:column;overflow-y:auto}
+  .win-head h1{font-size:25px}
+  .win-titlebar{gap:12px}
+  .modal-win,.focus-win{padding:24px;border-radius:26px}
+  .overlay{padding:16px}
+  .modal-win,.focus-win{max-height:calc(100dvh - 32px)}
+  .modal-ops{flex-wrap:wrap;gap:10px}
+}
+@media(max-width:520px){.brand{display:none}.tool-btn{width:36px;height:36px}.nav-btn{flex:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

@@ -10,6 +10,7 @@ import { createYiaHeadlessSession, disposeYiaHeadlessSession } from "./session-f
 import type { Logger } from "../logger.ts";
 
 interface WebSession {
+  root: string;
   prompt(text: string): Promise<string>;
   dispose(): Promise<void>;
 }
@@ -29,6 +30,17 @@ export function disposeSession(session = "web"): void {
   void s?.dispose();
 }
 
+/** 切模型时释放此运行时的缓存；下条消息从归档恢复历史并采用新默认模型。 */
+export async function disposeWebSessions(root: string): Promise<void> {
+  const sessions: WebSession[] = [];
+  for (const [key, session] of cache) {
+    if (session.root !== root) continue;
+    cache.delete(key);
+    sessions.push(session);
+  }
+  await Promise.all(sessions.map((session) => session.dispose()));
+}
+
 export async function webChat(text: string, root: string, agentDir: string, logger: Logger, session = "web"): Promise<string> {
   const sid = safeId(session);
   let s = cache.get(sid);
@@ -39,6 +51,7 @@ export async function webChat(text: string, root: string, agentDir: string, logg
     const sessionManager = reused ? SessionManager.open(file) : SessionManager.create(root);
     const session = await createYiaHeadlessSession(root, agentDir, sessionManager);
     s = {
+      root,
       async prompt(t: string) {
         await session.prompt(t);
         // 首次新建：把 pi 默认目录的会话文件复制到映射路径

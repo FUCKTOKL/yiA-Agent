@@ -23,7 +23,8 @@
  *   /*                          → 静态文件 yiA/web/
  */
 import { createServer, type Server } from "node:http";
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { extname, join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import net from "node:net";
@@ -35,6 +36,7 @@ import { loadWechatConfig, type WechatConfig } from "../channels/wechat-config.t
 import { ClawbotSender } from "../channels/clawbot/sender.ts";
 import { runCapture, logoutAllWeixinAccounts, bindCurrentAccount, validWechatPeer, gatewayCtl } from "../channels/weixin-ops.ts";
 import { Logger } from "../logger.ts";
+import { loadModelCatalog, type ModelChoice } from "./model-catalog.ts";
 
 export interface YiaServerDeps {
   root: string;
@@ -42,6 +44,8 @@ export interface YiaServerDeps {
   /** 依赖注入（单测用假实现）；缺省用真实 chat 会话工厂 */
   chat?: (text: string) => Promise<string>;
   agentDir?: string;
+  modelCatalog?: () => Promise<ModelChoice[]>;
+  resetChatSessions?: () => Promise<void>;
 }
 
 const MIME: Record<string, string> = {
@@ -86,6 +90,8 @@ export function createYiaServer(deps: YiaServerDeps): Server {
   const wcfg: WechatConfig | null = loadWechatConfig(root);
   const wechat = wcfg ? new ClawbotSender(wcfg, logger) : null;
   const webDir = resolve(root, "yiA", "web");
+  const agentDir = deps.agentDir ?? join(root, "runtime", "agent");
+  const modelCatalog = deps.modelCatalog ?? (() => loadModelCatalog(agentDir));
 
   const json = (res: any, code: number, body: unknown) => {
     res.writeHead(code, { "content-type": "application/json; charset=utf-8" });
@@ -337,26 +343,20 @@ export function createYiaServer(deps: YiaServerDeps): Server {
         // ── 模型接入（Web 版 /login）：查看当前接入 + 更新 API key + 切默认模型 ──
         if (path === "/api/login" && req.method === "GET") {
           let auth: Record<string, unknown> = {};
-          const authFile = join(root, "runtime", "agent", "auth.json");
+          const authFile = join(agentDir, "auth.json");
           if (existsSync(authFile)) {
             const raw = JSON.parse(readFileSync(authFile, "utf8")) as Record<string, { type?: string }>;
             auth = Object.fromEntries(Object.keys(raw).map((p) => [p, raw[p]?.type ?? "api_key"]));
           }
           let settings: any = {};
-          const settingsFile = join(root, "runtime", "agent", "settings.json");
+          const settingsFile = join(agentDir, "settings.json");
           if (existsSync(settingsFile)) settings = JSON.parse(readFileSync(settingsFile, "utf8"));
-          // 可选模型清单从 models-store 读（id+name）
-          const storeFile = join(root, "runtime", "agent", "models-store.json");
-          const models: { id: string; name: string }[] = [];
-          if (existsSync(storeFile)) {
-            const store = JSON.parse(readFileSync(storeFile, "utf8")) as Record<string, { models?: { id: string; name: string }[] }>;
-            for (const prov of Object.values(store)) for (const mm of prov.models ?? []) models.push({ id: mm.id, name: mm.name });
-          }
+          const models = await modelCatalog();
           return json(res, 200, { auth, defaultModel: settings.defaultModel ?? "", defaultProvider: settings.defaultProvider ?? "", models });
         }
         if (path === "/api/login" && req.method === "POST") {
           const p = await body(req);
-          const authFile = join(root, "runtime", "agent", "auth.json");
+          const authFile = join(agentDir, "auth.json");
           if (!p?.provider || !p?.key || String(p.key).length < 8) return json(res, 400, { error: "需要 provider 与 key（≥8 字符）" });
           const auth = existsSync(authFile) ? JSON.parse(readFileSync(authFile, "utf8")) : {};
           auth[String(p.provider)] = { type: "api_key", key: String(p.key) };
@@ -365,13 +365,32 @@ export function createYiaServer(deps: YiaServerDeps): Server {
         }
         if (path === "/api/model" && req.method === "POST") {
           const p = await body(req);
-          if (!p?.model) return json(res, 400, { error: "需要 model" });
-          const settingsFile = join(root, "runtime", "agent", "settings.json");
-          const settings = existsSync(settingsFile) ? JSON.parse(readFileSync(settingsFile, "utf8")) : {};
-          settings.defaultModel = String(p.model);
-          if (p.provider) settings.defaultProvider = String(p.provider);
-          writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n", "utf8");
-          return json(res, 200, { ok: true, note: "新会话生效" });
+          if (typeof p?.model !== "string" || !p.model.trim()) return json(res, 400, { error: "请选择模型。" });
+          if (chatBusy) return json(res, 409, { error: "请等当前回复结束后再切换模型。" });
+          chatBusy = true;
+          try {
+            const choices = (await modelCatalog()).filter((m) => m.id === p.model && (!p.provider || m.provider === p.provider));
+            if (choices.length !== 1) return json(res, 400, { error: "模型不可用或存在同名模型，请重新选择服务商与模型。" });
+            const selected = choices[0];
+            // 在修改配置前关闭旧 Web 会话；历史文件不删，下条消息按新模型恢复。
+            if (deps.resetChatSessions) await deps.resetChatSessions();
+            else await (await import("../chat/session.ts")).disposeWebSessions(root);
+            mkdirSync(agentDir, { recursive: true });
+            const settingsFile = join(agentDir, "settings.json");
+            const settings = existsSync(settingsFile) ? JSON.parse(readFileSync(settingsFile, "utf8")) : {};
+            settings.defaultProvider = selected.provider;
+            settings.defaultModel = selected.id;
+            const temporary = `${settingsFile}.${randomUUID()}.tmp`;
+            try {
+              writeFileSync(temporary, JSON.stringify(settings, null, 2) + "\n", "utf8");
+              renameSync(temporary, settingsFile);
+            } finally {
+              rmSync(temporary, { force: true });
+            }
+            return json(res, 200, { ok: true, provider: selected.provider, model: selected.id, note: "已保存，网页与微信的下一条消息使用此模型，聊天记录保留。" });
+          } finally {
+            chatBusy = false;
+          }
         }
 
         // 删除会话（本地历史归档；微信侧不受影响）：删文件 + 卸载内存缓存

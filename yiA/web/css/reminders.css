@@ -1,5 +1,5 @@
 /* 页面三：提醒 */
-.rem-note{font-family:var(--mono);font-size:12px;color:var(--t3);margin:16px 0 4px}
+.rem-note{font-size:12px;line-height:1.7;color:var(--t3);margin:0 0 14px}
 .rem-list{flex:1;min-height:0;padding-right:8px}
 .rem-row{display:grid;grid-template-columns:150px 1fr 110px 130px;align-items:center;gap:16px;
   min-height:64px;padding:10px 6px;border-bottom:1px solid var(--hair);transition:background .2s}
@@ -17,3 +17,13 @@
 .rem-row.done{opacity:.4}
 .rem-row.done .rem-txt{text-decoration:line-through}
 .rem-row.done:hover{background:none}
+.rem-txt{overflow-wrap:anywhere}
+@media(max-width:1000px){.rem-row{grid-template-columns:110px minmax(0,1fr) 72px 100px;gap:12px}}
+@media(max-width:600px){
+  .rem-row{grid-template-columns:88px minmax(0,1fr);gap:10px;padding:14px 0}
+  .rem-row .badge{grid-column:1}
+  .rem-ops{grid-column:2;gap:12px}
+  .rem-time{font-size:12px}
+  .rem-txt{font-size:14px}
+  #newRemBtn{padding:10px 14px}
+}

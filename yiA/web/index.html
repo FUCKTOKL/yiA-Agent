@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="css/memory.css">
 <link rel="stylesheet" href="css/reminders.css">
 <link rel="stylesheet" href="css/wechat.css">
+<link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
 
@@ -18,16 +19,16 @@
 <!-- 标签轨 -->
 <nav class="rail glass">
   <div class="brand">yiA</div>
-  <button class="nav-btn active" data-page="chat" title="对话">
+  <button class="nav-btn active" data-page="chat" title="对话" aria-label="对话">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/></svg>
   </button>
-  <button class="nav-btn" data-page="memory" title="记忆图谱">
+  <button class="nav-btn" data-page="memory" title="记忆图谱" aria-label="记忆图谱">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6" cy="17" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M8 15.5 15 8M9.5 17H14"/></svg>
   </button>
-  <button class="nav-btn" data-page="reminders" title="提醒">
+  <button class="nav-btn" data-page="reminders" title="提醒" aria-label="提醒">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
   </button>
-  <button class="nav-btn" data-page="wechat" title="微信">
+  <button class="nav-btn" data-page="wechat" title="微信" aria-label="微信">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 10.5c0 3.6-3.6 6.5-8 6.5-.9 0-1.8-.1-2.6-.4L5 18l.9-3A6.2 6.2 0 0 1 4 10.5C4 6.9 7.6 4 12 4s8 2.9 8 6.5z"/><circle cx="9.5" cy="10.5" r=".8" fill="currentColor"/><circle cx="14.5" cy="10.5" r=".8" fill="currentColor"/></svg>
   </button>
   <div class="rail-spacer"></div>
@@ -60,7 +61,7 @@
         <div class="win-titlebar">
           <div class="win-head">
             <h1>对话</h1>
-            <div class="sub">runtime/chats/web.jsonl · SSE · 会话连续</div>
+            <div class="sub">随时记录、回忆，或安排下一件事</div>
           </div>
           <div class="spacer"></div>
         </div>
@@ -96,10 +97,21 @@
 
     <aside class="island glass hist-island">
       <div class="win-pad">
-        <div class="win-head"><h1 style="font-size:18px">会话</h1><div class="spacer"></div><button class="btn-glass" id="newChatBtn" style="padding:6px 12px;font-size:13px">＋ 新对话</button></div>
+        <div class="win-titlebar hist-heading">
+          <div class="win-head">
+            <h2>会话</h2>
+            <button class="btn-glass btn-compact" id="newChatBtn">＋ 新对话</button>
+          </div>
+          <button class="icon-btn model-trigger" id="modelSettingsBtn" type="button" title="模型设置" aria-label="模型设置" aria-haspopup="dialog" aria-controls="modelOv">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h4m4 0h8M4 12h10m4 0h2M4 18h2m4 0h10"/><circle cx="10" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
+          </button>
+        </div>
         <div class="hairline"></div>
         <div class="hist-list scroller" id="histList"></div>
-        <div class="sub" style="padding:10px 2px;opacity:.6">微信 / Web 通道共用同一大脑，各会话独立连续</div>
+        <div class="session-footnote">
+          <div class="current-model" id="currentModelName">读取模型…</div>
+          <p class="sub">微信与网页共享记忆<br>各会话独立保留</p>
+        </div>
       </div>
     </aside>
   </section>
@@ -108,11 +120,13 @@
   <section class="page islands-page" data-page="memory">
     <div class="island island-l glass">
       <div class="win-pad">
-        <div class="win-head">
-          <h1>记忆图谱</h1>
-          <div class="sub">L2 knowledge · runtime/l2/entries/*.md</div>
+        <div class="win-titlebar">
+          <div class="win-head">
+            <h1>记忆图谱</h1>
+            <div class="sub">保存的记忆，以及它们之间的联系</div>
+          </div>
         </div>
-        <div class="hairline" style="margin-bottom:18px"></div>
+        <div class="hairline"></div>
         <div class="search-row">
           <div class="search-box glass-sub">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -133,8 +147,12 @@
     </div>
 
     <div class="island island-r glass">
-      <div class="win-pad" style="position:relative">
-        <div class="fb-toggle glass-sub" id="fbToggle">图谱不可用时显示关联列表<span class="sw"></span></div>
+      <div class="win-pad">
+        <div class="win-titlebar graph-heading">
+          <div class="win-head"><h2>关联图谱</h2><div class="sub">拖动节点，探索记忆之间的联系</div></div>
+          <button class="fb-toggle glass-sub" id="fbToggle" type="button" role="switch" aria-checked="false" aria-label="显示关联列表">列表<span class="sw"></span></button>
+        </div>
+        <div class="hairline"></div>
         <div class="graph-wrap" id="graphWrap">
           <svg id="graph" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid meet">
             <g id="gview"></g>
@@ -156,13 +174,13 @@
       <div class="win-titlebar">
         <div class="win-head">
           <h1>提醒</h1>
-          <div class="sub">runtime/scheduler/jobs.json · 调度守护派发</div>
+          <div class="sub">把要紧的事交给 yiA，到点提醒您</div>
         </div>
         <div class="spacer"></div>
         <button class="btn-solid" id="newRemBtn">＋ 新建提醒</button>
       </div>
       <div class="hairline"></div>
-      <div class="rem-note">按触发时间排序 · 唯一触发者=调度守护 · 错过自动补发 · 自然语言时间请走对话页</div>
+      <div class="rem-note">按时间排列 · 错过后补发 · 也可以在对话里说「明早八点提醒我」</div>
       <div class="rem-list scroller" id="remList"></div>
       <div class="empty-block" id="remEmpty" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
@@ -175,9 +193,8 @@
   <!-- ===== 页面四：微信 ===== -->
   <section class="page" data-page="wechat">
     <div class="window glass win-pad">
-      <div class="win-head">
-        <h1>微信</h1>
-        <div class="sub">runtime/config/wechat.json · 推送通道</div>
+      <div class="win-titlebar">
+        <div class="win-head"><h1>微信</h1><div class="sub">连接您的微信，让记忆和提醒随身而行</div></div>
       </div>
       <div class="hairline"></div>
       <div class="wx-grid">
@@ -260,10 +277,10 @@
 
 <!-- 编辑条目 -->
 <div class="overlay" id="editOv">
-  <div class="modal-win glass" style="width:560px">
+  <div class="modal-win glass editor-win">
     <h3>编辑记忆</h3>
     <div class="field"><label>标题</label><input id="edTitle"></div>
-    <div class="field"><label>正文</label><textarea id="edBody" rows="7" style="width:100%;background:rgba(0,0,0,.25);border:1px solid var(--line);color:var(--t1);border-radius:12px;padding:10px 12px;font:inherit;resize:vertical"></textarea></div>
+    <div class="field"><label>正文</label><textarea id="edBody" rows="7"></textarea></div>
     <div class="modal-ops">
       <button class="btn-glass" data-close="editOv">取消</button>
       <button class="btn-solid" id="edSave">保存</button>
@@ -286,7 +303,7 @@
 
 <!-- 换绑向导 -->
 <div class="overlay" id="rebindOv">
-  <div class="modal-win glass" style="width:640px">
+  <div class="modal-win glass settings-win">
     <h3>换绑微信（五步向导）</h3>
     <div class="rb-steps">
       <span class="rb-step on">1 登出</span><span class="rb-step">2 扫码</span><span class="rb-step">3 配对</span><span class="rb-step">4 推送目标</span><span class="rb-step">5 重启</span>
@@ -321,6 +338,27 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- 模型设置：与微信换绑共用窗口材质和宽度，不展示或写入任何密钥 -->
+<div class="overlay" id="modelOv" role="dialog" aria-modal="true" aria-labelledby="modelTitle" aria-describedby="modelDescription">
+  <form class="modal-win glass settings-win" id="modelForm">
+    <div class="modal-heading">
+      <h3 id="modelTitle">模型设置</h3>
+      <button class="icon-btn" type="button" data-close="modelOv" aria-label="关闭模型设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <p id="modelDescription">选择 yiA 使用的模型。网页与微信共用这份设置，切换不会删除聊天记录。</p>
+    <div class="model-current glass-sub"><span class="field-caption">当前使用</span><strong id="modelCurrent">正在读取…</strong><span class="model-detail" id="modelCurrentProvider"></span></div>
+    <div class="field"><label for="modelProvider">服务商</label><select id="modelProvider" disabled><option value="">正在读取…</option></select></div>
+    <div class="field"><label for="modelChoice">模型</label><select id="modelChoice" disabled><option value="">请先选择服务商</option></select></div>
+    <div class="model-detail model-selection" id="modelSelection"></div>
+    <p class="form-status" id="modelFeedback" aria-live="polite"></p>
+    <div class="modal-ops">
+      <button class="link-btn model-reload" type="button" id="modelReloadBtn">重新读取</button>
+      <button class="btn-glass" type="button" data-close="modelOv">关闭</button>
+      <button class="btn-solid" type="submit" id="modelSaveBtn" disabled>保存设置</button>
+    </div>
+  </form>
 </div>
 
 <script type="module" src="js/app.js"></script>
