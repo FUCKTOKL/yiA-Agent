@@ -1,0 +1,31 @@
+/* 原书表面独立于玻璃外壳；阅读区固定排版，检索文字另放折叠层。 */
+.book-read-content{gap:10px}
+.book-reader-tools{display:flex;align-items:center;gap:10px;min-width:0;flex:none;font-size:12px;color:var(--t3)}
+.book-reader-tools select{min-width:0;max-width:100%;border:1px solid var(--input-border);border-radius:10px;padding:7px 9px;background:var(--input-bg);color:var(--t1);font:inherit;color-scheme:dark}
+body.light .book-reader-tools select{color-scheme:light}
+#bookZoom{width:110px;flex:none}
+#bookContents{flex:1}
+.book-mapping{font-size:12px;line-height:1.6;color:var(--t3);flex:none}
+.book-document{flex:1;min-height:120px;min-width:0;position:relative;overflow:auto;background:rgba(0,0,0,.08);border:1px solid var(--hair);border-radius:10px;overscroll-behavior:contain}
+.book-original-frame{display:block;width:100%;height:100%;min-height:100%;border:0;background:#fff;color-scheme:light}
+.book-pdf-page{position:relative;margin:12px auto;background:#fff;box-shadow:0 1px 6px #0002;flex:none;overflow:hidden;box-sizing:content-box}
+.book-pdf-page canvas{display:block;max-width:none}
+.book-index-extract{flex:none;font-size:12px;color:var(--t3)}
+.book-index-extract summary{cursor:pointer;padding:2px 0;line-height:1.7}
+.book-index-extract .book-text{max-height:150px;min-height:0;font:13px/1.8 var(--sans);color:var(--t2);margin-top:8px;white-space:pre-wrap;overflow:auto}
+.book-jump{display:flex;align-items:center;gap:6px;min-width:0;color:var(--t3);font-size:12px}
+.book-jump input{width:48px;min-width:0;border:1px solid var(--input-border);border-radius:9px;padding:6px;background:var(--input-bg);color:var(--t1);font-family:var(--mono);font-size:12px;text-align:center;appearance:textfield;-moz-appearance:textfield}
+.book-jump input::-webkit-inner-spin-button,.book-jump input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.book-reading-wide .book-library{display:none}
+.book-reading-wide .book-reader{flex:1;min-height:0}
+.book-reading-wide .book-document{min-height:200px}
+.book-reader:has(#bookReadError:not([hidden])) .book-document:empty{display:none}
+/* TextLayer 的布局契约沿用 Mozilla PDF.js（Apache-2.0）；只取文本选择所需规则，不载入会影响应用的整套 viewer 样式。 */
+.book-pdf-page .textLayer{position:absolute;inset:0;overflow:clip;line-height:1;text-align:initial;letter-spacing:normal;word-spacing:normal;transform-origin:0 0;text-size-adjust:none;forced-color-adjust:none;--min-font-size:1;--text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size));--min-font-size-inv:calc(1 / var(--min-font-size))}
+.book-pdf-page .textLayer :is(span,br){position:absolute;color:transparent;white-space:pre;transform-origin:0 0;cursor:text;user-select:text}
+.book-pdf-page .textLayer> :not(.markedContent),.book-pdf-page .textLayer .markedContent span:not(.markedContent){z-index:1;--font-height:0;font-size:calc(var(--text-scale-factor) * var(--font-height));--scale-x:1;--rotate:0deg;transform:rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv))}
+.book-pdf-page .textLayer .markedContent{display:contents}
+.book-pdf-page .textLayer .yia-pdf-hit{background:rgba(245,192,66,.4);outline:1px solid rgba(175,120,25,.5);border-radius:2px}
+.book-pdf-page .textLayer ::selection{background:rgba(84,133,223,.3)}
+@media(max-width:1000px){.book-reader-tools{flex-wrap:wrap}#bookContents{flex-basis:100%}.book-pager{gap:8px}.book-jump{gap:4px}}
+@media(max-width:760px){.book-reader-tools:has(#bookContents:not([hidden])) label{display:none}#bookContents{flex-basis:0}.book-reading-wide .hairline{margin:12px 0}.book-reader{flex-basis:800px}.book-reading-wide{overflow:hidden}.book-reading-wide .book-reader{flex:1;min-height:0}.book-reading-wide .win-titlebar{min-height:48px}.book-reader-tools{gap:6px}.book-read-content{gap:8px}.book-document{min-height:160px}.book-reading-wide .book-document{min-height:140px}.book-pager{padding-top:8px}.book-index-extract .book-text{max-height:110px}}

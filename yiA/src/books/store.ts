@@ -1,9 +1,10 @@
 /** 独立书籍库：原文件、原文片段与 FTS5 索引在同一事务中落盘，不混入 L2。 */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { tokenize } from "../memory/l2/tokenizer.ts";
+import { legacyAnchor, readAnchor, normalizeBookText, type BookAnchor } from "./anchors.ts";
 
 export const MAX_BOOK_BYTES = 50 * 1024 * 1024;
 export const MAX_BOOK_CHARS = 5_000_000;
@@ -14,7 +15,7 @@ export class BookError extends Error {
   readonly status: number;
   constructor(message: string, status = 400) { super(message); this.name = "BookError"; this.status = status; }
 }
-export interface BookSection { text: string; location: string; }
+export interface BookSection { text: string; location: string; anchor?: BookAnchor; }
 export interface ParsedBook {
   title: string; author: string; sections: BookSection[]; sectionCount: number; warnings: string[];
 }
@@ -26,7 +27,7 @@ export interface Book {
 export interface BookHit {
   bookId: string; title: string; author: string; passage: number; location: string; text: string; warnings: string[];
 }
-export interface BookPassage { passage: number; location: string; text: string; }
+export interface BookPassage { passage: number; location: string; text: string; anchor: BookAnchor; }
 
 export function bookFileName(name: string): { name: string; format: BookFormat } {
   const base = name.replaceAll("\\", "/").split("/").pop()?.replace(/[\x00-\x1f\x7f]/g, "").trim() ?? "";
@@ -50,10 +51,10 @@ const bookRow = (row: unknown): Book => {
 };
 
 /** 1200 字一段，重叠 160 字；不跨 PDF 页/EPUB 章节，以免出处失真。 */
-function chunks(section: BookSection): { text: string; location: string }[] {
-  const out: { text: string; location: string }[] = [];
+function chunks(section: BookSection): { text: string; location: string; anchor: BookAnchor }[] {
+  const out: { text: string; location: string; anchor: BookAnchor }[] = [];
   const text = section.text.replace(/\r\n?/g, "\n");
-  let line = 1;
+  let line = 1, offset = 0;
   for (let start = 0; start < text.length;) {
     let end = Math.min(start + 1200, text.length);
     if (end < text.length) {
@@ -61,15 +62,19 @@ function chunks(section: BookSection): { text: string; location: string }[] {
       if (line > start + 700) end = line + 1;
       if (/[\uD800-\uDBFF]/.test(text[end - 1])) end--;
     }
-    const part = text.slice(start, end).trim();
+    const raw = text.slice(start, end), part = raw.trim();
     const location = section.location === "文字原文"
       ? `第 ${line}–${line + text.slice(start, end).split("\n").length - 1} 行`
       : section.location;
-    if (part) out.push({ text: part, location });
+    const anchor = section.location === "文字原文"
+      ? { kind: "text" as const, line: line + raw.slice(0, raw.length - raw.trimStart().length).split("\n").length - 1, endLine: line + raw.trimEnd().split("\n").length - 1, offset }
+      : { ...(section.anchor ?? legacyAnchor(location)), offset };
+    if (part) out.push({ text: part, location, anchor });
     if (end === text.length) break;
     let next = end - 160;
     if (/[\uDC00-\uDFFF]/.test(text[next])) next++;
     line += text.slice(start, next).split("\n").length - 1;
+    offset += normalizeBookText(text.slice(start, next)).length;
     start = next;
   }
   return out;
@@ -102,7 +107,7 @@ export class BookStore {
         CREATE TABLE IF NOT EXISTS passages(
           id INTEGER PRIMARY KEY, bookId TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
           passage INTEGER NOT NULL, location TEXT NOT NULL, text TEXT NOT NULL, tokens TEXT NOT NULL,
-          UNIQUE(bookId, passage)
+          anchor TEXT NOT NULL DEFAULT '{}', UNIQUE(bookId, passage)
         );
         CREATE VIRTUAL TABLE IF NOT EXISTS book_fts USING fts5(tokens, content='passages', content_rowid='id');
         CREATE TRIGGER IF NOT EXISTS book_passage_add AFTER INSERT ON passages BEGIN
@@ -112,7 +117,26 @@ export class BookStore {
           INSERT INTO book_fts(book_fts,rowid,tokens) VALUES('delete',old.id,old.tokens);
         END;
       `);
+      this.migrateAnchors(dir);
     } catch (e) { this.db.close(); throw e; }
+  }
+  private migrateAnchors(dir: string): void {
+    const hasAnchor = () => this.db.prepare("PRAGMA table_info(passages)").all().some(c => c.name === "anchor");
+    if (hasAnchor()) return;
+    if (Number(this.db.prepare("SELECT count(*) AS n FROM books").get()?.n)) {
+      const backups = join(dir, "backups"); mkdirSync(backups, { recursive: true });
+      // VACUUM INTO 生成包含 WAL 已提交内容的一致性副本，不直接拷贝活动数据库文件。
+      this.db.prepare("VACUUM INTO ?").run(join(backups, `library-before-reader-${randomUUID()}.db`));
+    }
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      if (!hasAnchor()) {
+        this.db.exec("ALTER TABLE passages ADD COLUMN anchor TEXT NOT NULL DEFAULT '{}'");
+        const update = this.db.prepare("UPDATE passages SET anchor=? WHERE id=?");
+        for (const row of this.db.prepare("SELECT id,location FROM passages").all()) update.run(JSON.stringify(legacyAnchor(String(row.location))), row.id);
+      }
+      this.db.exec("COMMIT");
+    } catch (e) { this.db.exec("ROLLBACK"); throw e; }
   }
   list(): Book[] {
     return this.db.prepare("SELECT id,title,author,format,sourceName,byteSize,charCount,sectionCount,passageCount,createdAt,warnings FROM books ORDER BY createdAt DESC,id").all().map(bookRow);
@@ -147,8 +171,8 @@ export class BookStore {
         book.id, hash, book.title, book.author, book.format, book.sourceName, book.byteSize,
         book.charCount, book.sectionCount, book.passageCount, book.createdAt, JSON.stringify(book.warnings), source,
       );
-      const ins = this.db.prepare("INSERT INTO passages(bookId,passage,location,text,tokens) VALUES(?,?,?,?,?)");
-      for (const [i, p] of parts.entries()) ins.run(book.id, i + 1, p.location, p.text, indexTokens(p.text));
+      const ins = this.db.prepare("INSERT INTO passages(bookId,passage,location,text,tokens,anchor) VALUES(?,?,?,?,?,?)");
+      for (const [i, p] of parts.entries()) ins.run(book.id, i + 1, p.location, p.text, indexTokens(p.text), JSON.stringify(p.anchor));
       this.db.exec("COMMIT");
       return { book, duplicate: false };
     } catch (e) { this.db.exec("ROLLBACK"); throw e; }
@@ -178,11 +202,15 @@ export class BookStore {
     });
   }
   passage(bookId: string, passage: number): BookPassage | undefined {
-    // SAFETY: SELECT 只返回 passage/location/text 的 NOT NULL 列，和 BookPassage 对应。
-    return this.db.prepare("SELECT passage,location,text FROM passages WHERE bookId=? AND passage=?").get(bookId, passage) as unknown as BookPassage | undefined;
+    // SAFETY: SQL 的四列与原始行结构一致，anchor 在返回前经过校验。
+    const row = this.db.prepare("SELECT passage,location,text,anchor FROM passages WHERE bookId=? AND passage=?").get(bookId, passage) as unknown as (Omit<BookPassage, "anchor"> & { anchor: string }) | undefined;
+    return row ? { ...row, anchor: readAnchor(row.anchor, row.location) } : undefined;
   }
   original(id: string): Uint8Array | undefined {
     return (this.db.prepare("SELECT source FROM books WHERE id=?").get(id) as { source: Uint8Array } | undefined)?.source;
+  }
+  originalRange(id: string, start: number, length: number): Uint8Array | undefined {
+    return (this.db.prepare("SELECT substr(source,?,?) AS source FROM books WHERE id=?").get(start + 1, length, id) as { source: Uint8Array } | undefined)?.source;
   }
   delete(id: string): boolean { return Number(this.db.prepare("DELETE FROM books WHERE id=?").run(id).changes) > 0; }
   close(): void { if (!this.closed) { this.db.close(); this.closed = true; } }

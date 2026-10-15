@@ -20,7 +20,9 @@
 
 ### 书籍库（独立于日常记忆）
 - ✅ 网页上传文字版 PDF、EPUB、TXT/Markdown；原件副本、元数据、分段原文和 FTS5 索引存入 `runtime/books/library.db`，一次事务提交、SHA-256 去重
-- ✅ 中英文关键词全文检索（含中文单字）、跨书/按书筛选、原文翻段、真实 PDF 文件页序/EPUB 节与路径/TXT 行号、原件下载与按书删除；删除同步清索引，不动用户上传前的源文件
+- ✅ 中英文关键词全文检索（含中文单字）、跨书/按书筛选、原件下载与按书删除；删除同步清索引，不动用户上传前的源文件
+- ✅ **原件阅读与定位**：本地 PDF.js 原版页、EPUB 无脚本沙箱排版/包内样式图片、Markdown 标题强调、TXT 行号；搜索/聊天引用跳原书页/节/行，能可靠匹配才高亮。80%–200% 缩放、页码/章节跳转、展开阅读、手机阅读模式；模型仍读独立纯文字索引
+- ✅ **旧书无损升级**：`passages.anchor` 结构化 JSON；新增前用 `VACUUM INTO` 一致性备份到 `runtime/books/backups/`。保留原件/编号/正文/FTS，不需重传；只回填旧记录已有的页/节/行，不猜字符偏移
 - ✅ Web/微信/TUI 共用只读 `list_books` / `search_books` / `read_book_passage` 工具；回答先查原文、注明出处，网页引用可点击跳转；原文仅为资料，不执行其中指令
 - ✅ 本机导入与网页检索不调用模型；只有对话查询的命中片段/上下文交给当前模型。50 MiB/500 万字符/2000 页或节上限，独立解析子进程、两分钟超时、ZIP 路径/解压体积/CRC 校验、本机同源请求保护
 - ○ OCR、DRM、语义向量检索、自动读书摘要未做；扫描件/少字页面会拒绝或提示覆盖范围
@@ -65,7 +67,7 @@
 - ○ Web 常驻服务化（现为手动 npm run web）
 
 ### 工程化
-- ✅ 单元测试 87 条（node:test，无额外测试框架；含原有记忆/提醒/模型/SSE 回归及书籍解析、原子导入、跨进程去重、索引删除、坏文件/坏库、HTTP 防护、只读查书工具）、loadcheck 扩展自检、bench 基准
+- ✅ 单元测试 96 条（node:test，无额外测试框架；含原有记忆/提醒/模型/SSE 回归及书籍解析、原子导入、跨进程去重、索引删除、坏文件/坏库、HTTP 防护、只读查书工具）、loadcheck 扩展自检、bench 基准
 - ✅ 破坏性用例：jobs.json/L2 损坏自动备份降级、配置缺失降级
 - ✅ 统一日志（本地时区按天分文件）、扩展工具异常返回错误文本不崩
 - ✅ 已开源（MIT，仓库 github.com/FUCKTOKL/yiA-Agent，**当前 PRIVATE 待转公开**）；双平台 provision 一键部署
@@ -81,7 +83,7 @@
 | 目录 | 代码全在 `yiA/`；数据 `runtime/`（gitignored 可整体备份）；加载器 `.pi/extensions/`；文档 `docs/` |
 | 运行时独立 | agentDir=`runtime/agent/`（settings/auth/models-store/sessions），与个人 `~/.pi/agent` 零共享；`PI_CODING_AGENT_DIR` 隔离。切模型须同时改此处 `settings.json` 的 defaultProvider/defaultModel，不认个人 Pi 设置；无头会话显式使用当前默认模型，旧微信会话不再绑定旧模型 |
 | 记忆三层 | L1 画像(JSON) / L2 知识库(MD+BM25) / L3 会话(FTS5)，阈值门控召回 |
-| 书籍库 | 与三层记忆分离，原件 BLOB/原文/FTS5 同存 `runtime/books/library.db`，**不是可删除重建的缓存**；坏库保留报错，不自动覆盖。导入与网页检索离线，对话工具只送命中片段；OCR/向量/自动摘要未实现。备份须覆盖整个 books 目录及 WAL |
+| 书籍库 | 与三层记忆分离，原件 BLOB/原文/FTS5 同存 `runtime/books/library.db`，**不是可删除重建的缓存**；坏库保留报错。阅读原件与模型索引分开，定位写入 `passages.anchor` JSON，旧库先一致性备份再加列，不重建正文/索引。EPUB 文档必须 sandbox 无脚本+CSP+资源白名单；远程资源不加载。OCR/向量/自动摘要未做；备份覆盖整个 books 目录及 WAL |
 | L2 多通道写入 | `runtime/l2/write-lock.db` 仅用作 SQLite 跨进程写锁；条目仍为 Markdown，临时文件原子替换；`runtime/l2/revision` 更新标记不依赖时间精度；网页保存和模型 refine 必须带 expectedVersion（模型从 recall 获取），过期网页返回 409 |
 | 提醒完成语义 | runner 等待异步推送成功，失败保持 pending；同一实例检查不重叠，停止等待当前推送。发送成功后落盘前若崩溃仍可能重发，优先不漏发，不承诺严格恰好一次 |
 | 提醒触发 | **唯一触发者=yia-scheduler 常驻守护**（Linux systemd / Windows 启动文件夹），TUI/chat-cli 不跑 runner 防双发 |
@@ -107,7 +109,7 @@
 
 ## 5. 工程约束（提交前检查）
 
-- 提交前（`yiA/` 目录）：`npm test`（87 用例）+ `npm run loadcheck` 必过
+- 提交前（`yiA/` 目录）：`npm test`（96 用例）+ `npm run loadcheck` 必过
 - 单测 node:test 不引第三方；每个 IO 边界有破坏性用例
 - 日志统一走 `yiA/src/logger.ts`（禁记记忆正文/凭据/会话原文；禁散落 console.log）
 - 工具 execute 必返回错误文本；工厂初始化不得抛出拖垮 pi；禁空 catch

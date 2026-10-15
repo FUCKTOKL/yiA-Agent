@@ -68,6 +68,9 @@ export const api = {
   searchBooks: (query, bookId = "") => req("GET", `/api/books/search?q=${encodeURIComponent(query)}&bookId=${encodeURIComponent(bookId)}`),
   bookPassage: (id, passage) => req("GET", `/api/books/${encodeURIComponent(id)}/passages/${passage}`),
   bookOriginal: (id) => `/api/books/${encodeURIComponent(id)}/original`,
+  bookContent: (id) => `/api/books/${encodeURIComponent(id)}/content`,
+  bookReaderInfo: (id) => req("GET", `/api/books/${encodeURIComponent(id)}/reader-info`),
+  bookView: (id, unit) => `/api/books/${encodeURIComponent(id)}/reader?unit=${unit}`,
   deleteBook: (id) => req("DELETE", `/api/books/${encodeURIComponent(id)}`),
   async importBook(file) {
     const res = await fetch(`/api/books/import?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });

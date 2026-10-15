@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/memory.css">
 <link rel="stylesheet" href="css/books.css">
+<link rel="stylesheet" href="css/book-reader.css">
 <link rel="stylesheet" href="css/reminders.css">
 <link rel="stylesheet" href="css/wechat.css">
 <link rel="stylesheet" href="css/settings.css">
@@ -197,16 +198,18 @@
     </div>
     <div class="island glass book-reader">
       <div class="win-pad">
-        <div class="win-titlebar"><div class="win-head"><h2 id="bookReadTitle">原文</h2><div class="sub" id="bookReadMeta">从书架或检索结果中打开一段文字</div></div></div>
+        <div class="win-titlebar"><div class="win-head"><h2 id="bookReadTitle">原书阅读</h2><div class="sub" id="bookReadMeta">保留原书排版，检索结果直接定位</div></div><button id="bookExpand" class="btn-glass btn-compact" type="button" aria-expanded="false" hidden>展开阅读</button></div>
         <div class="hairline"></div>
         <div id="bookReadEmpty" class="empty-block"><p>选择一本书，从原文开始</p></div>
         <p id="bookReadError" class="error-card" role="alert" hidden></p>
         <div id="bookReadContent" class="book-read-content" hidden>
           <div class="book-source"><span id="bookLocation"></span><a id="bookOriginal" class="link-btn">下载原文件</a></div>
-          <p id="bookWarning" class="book-warning" hidden></p>
-          <div id="bookText" class="book-text scroller" tabindex="0" aria-label="书籍原文"></div>
+          <div class="book-reader-tools"><label for="bookZoom">阅读比例</label><select id="bookZoom"><option value="fit">适合宽度</option><option value="0.8">80%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select><select id="bookContents" aria-label="章节或阅读单元" hidden></select></div>
+          <p id="bookReaderStatus" class="book-mapping" aria-live="polite"></p>
+          <div id="bookDocument" class="book-document scroller" tabindex="0" aria-label="原书页面"></div>
+          <details class="book-index-extract" id="bookExtract"><summary>查看检索文字与提取提示</summary><p id="bookWarning" class="book-warning" hidden></p><pre id="bookText" class="book-text scroller"></pre></details>
           <p id="bookCitation" class="book-citation"></p>
-          <div class="book-pager"><button class="btn-glass btn-compact" id="bookPrev" type="button">上一段</button><span id="bookPosition"></span><button class="btn-glass btn-compact" id="bookNext" type="button">下一段</button><button class="link-btn danger" id="bookDelete" type="button">删除此书</button></div>
+          <div class="book-pager"><button class="btn-glass btn-compact" id="bookPrev" type="button">上一页</button><form id="bookJumpForm" class="book-jump"><input id="bookPageNumber" type="number" min="1" value="1" aria-label="跳转页或章节"><span id="bookPosition"></span><button class="link-btn" type="submit">跳转</button></form><button class="btn-glass btn-compact" id="bookNext" type="button">下一页</button><button class="link-btn danger" id="bookDelete" type="button">删除此书</button></div>
         </div>
       </div>
     </div>
